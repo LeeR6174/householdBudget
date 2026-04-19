@@ -1,0 +1,56 @@
+import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Trash2 } from 'lucide-react';
+import { db } from '../db/db';
+import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
+import MonthSelector from '../components/MonthSelector';
+import TransactionItem from '../components/TransactionItem';
+
+export default function HistoryPage() {
+  const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
+  const { startDate, endDate } = getMonthRange(currentMonth);
+
+  const transactions = useLiveQuery(() => {
+    return db.transactions
+      .filter(tx => tx.date >= startDate && tx.date <= endDate)
+      .reverse()
+      .toArray();
+  }, [startDate, endDate]) || [];
+
+  const categories = useLiveQuery(() => db.categories.toArray()) || [];
+  const assets = useLiveQuery(() => db.assets.toArray()) || [];
+
+  const handleDelete = async (id) => {
+    if (window.confirm('この記録を削除しますか？')) {
+      await db.transactions.delete(id);
+    }
+  };
+
+  return (
+    <div className="page-container" style={{ paddingBottom: '100px' }}>
+      <div className="page-title">履歴一覧</div>
+      <MonthSelector currentMonth={currentMonth} onChange={setCurrentMonth} />
+      
+      <div className="card" style={{ padding: '0 16px' }}>
+        {transactions.map(tx => (
+          <div key={tx.id} style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <TransactionItem transaction={tx} categories={categories} assets={assets} />
+            </div>
+            <button 
+              onClick={() => handleDelete(tx.id)}
+              style={{ padding: '16px 0 16px 16px', border: 'none', background: 'transparent', color: 'var(--danger-color)', cursor: 'pointer' }}
+            >
+              <Trash2 size={20} />
+            </button>
+          </div>
+        ))}
+        {transactions.length === 0 && (
+          <div className="text-center py-xl text-secondary">
+            この期間の履歴がありません
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
