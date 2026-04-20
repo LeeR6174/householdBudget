@@ -88,6 +88,7 @@ button, a, input, select, textarea, .list-item, .card {
 .text-primary { color: var(--primary-color); }
 .text-secondary { color: var(--text-secondary); }
 .text-sm { font-size: 0.875rem; }
+.text-base { font-size: 1rem; }
 .text-lg { font-size: 1.125rem; }
 .text-xl { font-size: 1.25rem; }
 .text-2xl { font-size: 1.5rem; }

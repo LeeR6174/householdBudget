@@ -12,6 +12,12 @@ export default function AIImportPage() {
 
   const assets = useLiveQuery(() => db.assets.where('type').equals('credit').toArray()) || [];
 
+  React.useEffect(() => {
+    if (assets.length > 0 && !selectedAssetId) {
+      setSelectedAssetId(assets[0].id);
+    }
+  }, [assets, selectedAssetId]);
+
   const promptText = `以下のクレジットカード利用明細のスクリーンショット画像を読み取り、内容を抽出して、以下の純粋なJSON形式（配列）のみを出力してください。余計な説明文は一切含めないでください。
 
 【出力形式】
@@ -104,19 +110,35 @@ export default function AIImportPage() {
           {copied ? 'コピーしました！' : 'AI用プロンプトをコピー'}
         </button>
         
-        <div className="form-group">
-          <label className="form-label">インポート先のカード</label>
-          <select 
-            className="form-control" 
-            value={selectedAssetId} 
-            onChange={(e) => setSelectedAssetId(e.target.value)}
-          >
-            <option value="">選択してください</option>
-            {assets.map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
-        </div>
+        {assets.length > 1 ? (
+          <div className="form-group">
+            <label className="form-label">インポート先のカード</label>
+            <select 
+              className="form-control" 
+              value={selectedAssetId} 
+              onChange={(e) => setSelectedAssetId(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {assets.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+        ) : assets.length === 1 ? (
+          <div className="form-group">
+            <label className="form-label">インポート先のカード</label>
+            <div className="form-control" style={{ backgroundColor: '#f1f5f9', color: 'var(--text-secondary)' }}>
+              {assets[0].name}
+            </div>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label className="form-label">インポート先のカード</label>
+            <div className="form-control text-danger" style={{ fontSize: '0.875rem' }}>
+              クレジットカードが登録されていません。設定から追加してください。
+            </div>
+          </div>
+        )}
 
         <div className="form-group">
           <label className="form-label">AIの出力(JSON)を貼り付け</label>

@@ -14,8 +14,8 @@ export default function TransactionItem({ transaction, categories, assets, onCli
   // 振替の場合のUI
   if (isTransfer) {
     return (
-      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-        <div className="flex-center gap-md">
+      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', alignItems: 'center' }}>
+        <div className="flex items-center gap-md flex-1 min-w-0">
           <div 
             style={{ backgroundColor: '#e2e8f0', color: '#475569', border: '0' }}
             className="w-12 h-12 rounded-full flex-center font-bold text-xs flex-shrink-0"
@@ -23,20 +23,20 @@ export default function TransactionItem({ transaction, categories, assets, onCli
             振替
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold flex items-center gap-sm text-sm truncate">
+            <div className="text-xs text-secondary mb-xs">
+              {formatDate(transaction.date)}
+            </div>
+            <div className="font-bold flex items-center gap-sm text-base truncate">
               <span>{fromAsset?.name || '不明'}</span>
               <ArrowRight size={14} className="text-secondary" />
               <span>{toAsset?.name || '不明'}</span>
             </div>
-            <div className="text-xs text-secondary flex flex-col mt-0.5">
-              <span>{formatDate(transaction.date)}</span>
-              {transaction.content && (
-                <span className="text-primary truncate">{transaction.content}</span>
-              )}
-            </div>
+            {transaction.content && (
+              <div className="text-xs text-secondary truncate mt-xs">{transaction.content}</div>
+            )}
           </div>
         </div>
-        <div className="font-bold text-secondary">
+        <div className="font-bold text-secondary text-right ml-md">
           {formatCurrency(transaction.amount)}
         </div>
       </div>
@@ -45,8 +45,8 @@ export default function TransactionItem({ transaction, categories, assets, onCli
 
   // 収入・支出のUI
   return (
-    <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      <div className="flex-center gap-md">
+    <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', alignItems: 'center' }}>
+      <div className="flex items-center gap-md flex-1 min-w-0">
         <div 
           style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff', border: '0' }}
           className="w-12 h-12 rounded-full flex-center font-bold flex-shrink-0 text-xl"
@@ -65,12 +65,12 @@ export default function TransactionItem({ transaction, categories, assets, onCli
               {asset?.name || '不明資産'}
             </span>
           </div>
-          <div className="font-semibold truncate">
+          <div className="font-bold text-base truncate">
             {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '名称未設定'}
           </div>
         </div>
       </div>
-      <div className={`font-bold ${isIncome ? 'text-income' : 'text-expense'}`}>
+      <div className={`font-bold text-lg text-right ml-md ${isIncome ? 'text-income' : 'text-expense'}`}>
         {isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
       </div>
     </div>

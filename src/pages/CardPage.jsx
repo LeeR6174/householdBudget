@@ -78,14 +78,14 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) =>
           border: '1px solid rgba(0,0,0,0.02)'
         }}
       >
-        <div className="flex-between">
-          <div>
+        <div className="flex-between" style={{ alignItems: 'center' }}>
+          <div className="flex-1 min-w-0">
             <div className="text-xs text-secondary mb-xs">{formatDate(transaction.date)}</div>
-            <div className="font-bold" style={{ fontSize: '1.05rem' }}>{transaction.content || '名称未設定'}</div>
+            <div className="font-bold truncate" style={{ fontSize: '1.1rem', lineHeight: '1.2' }}>{transaction.content || '名称未設定'}</div>
             <div className="text-xs text-secondary mt-xs">{categoryName}</div>
           </div>
-          <div className="text-right">
-            <div className="font-bold text-expense" style={{ fontSize: '1.1rem' }}>¥{transaction.amount.toLocaleString()}</div>
+          <div className="text-right ml-md flex-shrink-0">
+            <div className="font-bold text-expense" style={{ fontSize: '1.2rem', lineHeight: '1.2' }}>¥{transaction.amount.toLocaleString()}</div>
             <div className="text-xs font-semibold mt-1" style={{ color: isConfirmed ? 'var(--income-color)' : 'var(--warning-color)' }}>
               {isConfirmed ? '今月支払い分' : '未確定'}
             </div>
