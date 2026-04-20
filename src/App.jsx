@@ -14,6 +14,7 @@ import AnalysisPage from './pages/AnalysisPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import InitialBalancePage from './pages/InitialBalancePage';
+import AIImportPage from './pages/AIImportPage';
 
 function BottomNav() {
   const location = useLocation();
@@ -120,6 +121,7 @@ function App() {
           <Route path="/settings/categories" element={<CategoriesPage />} />
           <Route path="/settings/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/settings/initial-balance" element={<InitialBalancePage />} />
+          <Route path="/settings/ai-import" element={<AIImportPage />} />
         </Routes>
         <BottomNav />
       </div>

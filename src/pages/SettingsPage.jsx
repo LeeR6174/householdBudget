@@ -206,6 +206,14 @@ export default function SettingsPage() {
 
       <div className="card">
         <h3 className="font-bold mb-md">データのインポート</h3>
+        
+        <div className="form-group mb-lg">
+          <p className="text-sm text-secondary mb-sm">AI（ChatGPT等）を使って、クレカのスクショから明細を一括登録します。</p>
+          <button className="btn btn-primary w-full" onClick={() => navigate('/settings/ai-import')} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}>
+            ✨ AI明細インポート
+          </button>
+        </div>
+
         <button className="btn btn-outline mb-lg w-full" onClick={() => fileInputRef.current?.click()}>
           Excelを取り込む (.xlsx)
         </button>
