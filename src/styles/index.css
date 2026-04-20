@@ -107,6 +107,12 @@ button, a, input, select, textarea, .list-item, .card {
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Utilities */
+.w-10 { width: 40px; }
+.h-10 { height: 40px; }
+.rounded-full { border-radius: 9999px; }
+.flex-shrink-0 { flex-shrink: 0; }
+
 .card:active {
   transform: scale(0.995);
 }

@@ -17,7 +17,7 @@ export default function TransactionItem({ transaction, categories, assets, onCli
       <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
         <div className="flex-center gap-md">
           <div 
-            style={{ backgroundColor: '#e2e8f0', color: '#475569' }}
+            style={{ backgroundColor: '#e2e8f0', color: '#475569', border: 'none' }}
             className="w-10 h-10 rounded-full flex-center font-bold text-xs flex-shrink-0"
           >
             振替
@@ -48,8 +48,8 @@ export default function TransactionItem({ transaction, categories, assets, onCli
     <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <div className="flex-center gap-md">
         <div 
-          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff' }}
-          className="w-10 h-10 rounded-full flex-center font-bold flex-shrink-0"
+          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff', border: 'none' }}
+          className="w-10 h-10 rounded-full flex-center font-bold flex-shrink-0 text-lg"
         >
           {category?.name?.[0] || '?'}
         </div>

@@ -21,6 +21,12 @@ export default function AddTransactionPage() {
   const [memo, setMemo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
+  const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  
+  const allTx = useLiveQuery(() => db.transactions.toArray()) || [];
+  const contentSuggestions = Array.from(new Set(allTx.filter(t => t.content).map(t => t.content)));
+
   // Fetch existing transaction if editing
   const existingTx = useLiveQuery(async () => {
     if (!id) return null;
@@ -42,13 +48,7 @@ export default function AddTransactionPage() {
       // Auto-select asset if only one exists
       setAssetId(assets[0].id);
     }
-  }, [existingTx, assets.length]);
-
-  const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
-  const assets = useLiveQuery(() => db.assets.toArray()) || [];
-  
-  const allTx = useLiveQuery(() => db.transactions.toArray()) || [];
-  const contentSuggestions = Array.from(new Set(allTx.filter(t => t.content).map(t => t.content)));
+  }, [existingTx, assets.length, isEditing]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -108,6 +108,15 @@ export default function AddTransactionPage() {
       alert('保存に失敗しました');
     }
   };
+
+  // Loading guard for edit mode
+  if (isEditing && existingTx === undefined) {
+    return (
+      <div className="page-container flex-center" style={{ minHeight: '80vh' }}>
+        <div className="text-secondary font-bold">読み込み中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
