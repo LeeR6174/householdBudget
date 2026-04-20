@@ -99,6 +99,19 @@ export default function HomePage() {
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="page-title">ホーム</div>
+
+      {/* 初期設定案内バナー */}
+      {assets.length === 0 && (
+        <div className="card mb-lg" style={{ border: '2px dashed var(--primary-color)', backgroundColor: 'rgba(79, 70, 229, 0.05)', textAlign: 'center' }}>
+          <div className="text-2xl mb-sm">👋 はじめまして！</div>
+          <p className="text-sm text-secondary mb-md">
+            まずは口座の残高や貯金の目標を設定して、家計簿をスタートしましょう。
+          </p>
+          <button className="btn btn-primary" onClick={() => navigate('/settings/initial-balance')}>
+            初期設定をする
+          </button>
+        </div>
+      )}
       <MonthSelector currentMonth={currentMonth} onChange={setCurrentMonth} />
       
       {/* 👑 4階層の資産表示 (Premium Card Widget) */}

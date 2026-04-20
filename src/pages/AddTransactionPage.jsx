@@ -38,8 +38,11 @@ export default function AddTransactionPage() {
       setContent(existingTx.content || '');
       setMemo(existingTx.memo || '');
       setDate(existingTx.date);
+    } else if (!isEditing && assets.length === 1) {
+      // Auto-select asset if only one exists
+      setAssetId(assets[0].id);
     }
-  }, [existingTx]);
+  }, [existingTx, assets.length]);
 
   const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
@@ -109,9 +112,9 @@ export default function AddTransactionPage() {
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="flex gap-sm items-center mb-lg">
-        <button className="btn btn-outline" style={{ border: 'none', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary-color)' }} onClick={() => navigate('/')}>
-          <ChevronLeft size={20} />
-          <span className="font-bold">戻る</span>
+        <button className="btn-back" onClick={() => navigate('/')}>
+          <ChevronLeft size={24} />
+          <span>戻る</span>
         </button>
         <div className="page-title" style={{ marginBottom: 0 }}>{isEditing ? '記録の編集' : '記録の追加'}</div>
       </div>
