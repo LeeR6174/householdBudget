@@ -12,15 +12,16 @@ export default defineConfig({
         name: '格が違う家計簿',
         short_name: '格が違う家計簿',
         description: '本格スマホ特化のPWA家計簿アプリ',
-        theme_color: '#4f46e5',
-        background_color: '#f8fafc',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'pwa-512x512.png',
