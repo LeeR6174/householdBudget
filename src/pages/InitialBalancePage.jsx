@@ -26,9 +26,9 @@ export default function InitialBalancePage() {
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="flex gap-sm items-center mb-lg">
-        <button className="btn btn-outline" style={{ border: 'none', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary-color)' }} onClick={() => navigate('/settings')}>
-          <ChevronLeft size={20} />
-          <span className="font-bold">戻る</span>
+        <button className="btn-back" onClick={() => navigate(-1)}>
+          <ChevronLeft size={24} />
+          <span>戻る</span>
         </button>
         <div className="page-title" style={{ marginBottom: 0 }}>初期残高・貯金設定</div>
       </div>

@@ -121,7 +121,7 @@ export default function AddTransactionPage() {
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="flex gap-sm items-center mb-lg">
-        <button className="btn-back" onClick={() => navigate('/')}>
+        <button className="btn-back" onClick={() => navigate(-1)}>
           <ChevronLeft size={24} />
           <span>戻る</span>
         </button>

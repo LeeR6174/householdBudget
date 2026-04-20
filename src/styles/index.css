@@ -110,6 +110,8 @@ button, a, input, select, textarea, .list-item, .card {
 /* Utilities */
 .w-10 { width: 40px; }
 .h-10 { height: 40px; }
+.w-12 { width: 48px; }
+.h-12 { height: 48px; }
 .rounded-full { border-radius: 9999px; }
 .flex-shrink-0 { flex-shrink: 0; }
 
@@ -216,20 +218,21 @@ button, a, input, select, textarea, .list-item, .card {
 .btn-back {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 10px 20px;
   border: none;
-  background: transparent;
+  background: rgba(79, 70, 229, 0.05);
   color: var(--primary-color);
   font-weight: 700;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: background-color 0.2s;
-  margin-left: -8px; /* Offset padding for alignment */
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+  margin-left: -8px;
+  min-width: 100px; /* Larger width as requested */
 }
 
 .btn-back:active {
-  background-color: rgba(79, 70, 229, 0.1);
+  background-color: rgba(79, 70, 229, 0.15);
   transform: scale(0.95);
 }
 

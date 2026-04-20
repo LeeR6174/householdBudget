@@ -7,13 +7,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: ['favicon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png'],
       manifest: {
         name: '格が違う家計簿',
         short_name: '格が違う家計簿',
         description: '本格スマホ特化のPWA家計簿アプリ',
-        theme_color: '#ffffff',
+        theme_color: '#4f46e5',
+        background_color: '#f8fafc',
         display: 'standalone',
+        orientation: 'portrait',
         icons: [
           {
             src: 'pwa-192x192.png',
