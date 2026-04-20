@@ -23,7 +23,10 @@ export default function CategoriesPage() {
 
   const thisMonthSettings = useLiveQuery(async () => {
     if (!editId) return null;
-    return await db.monthlyBudgets.where({ categoryId: editId, month: currentMonthStr }).first();
+    return await db.monthlyBudgets
+      .where('categoryId').equals(editId)
+      .and(b => b.month === currentMonthStr)
+      .first();
   }, [editId, currentMonthStr]);
 
   // Update thisMonthBudget when thisMonthSettings changes
@@ -79,7 +82,10 @@ export default function CategoriesPage() {
       await db.categories.update(editId, catData);
       // Save monthly budget if specified
       if (thisMonthBudget !== '') {
-        const existing = await db.monthlyBudgets.where({ categoryId: editId, month: currentMonthStr }).first();
+        const existing = await db.monthlyBudgets
+          .where('categoryId').equals(editId)
+          .and(b => b.month === currentMonthStr)
+          .first();
         if (existing) {
           await db.monthlyBudgets.update(existing.id, { budget: Number(thisMonthBudget) });
         } else {
@@ -87,7 +93,10 @@ export default function CategoriesPage() {
         }
       } else {
         // Clear if empty
-        const existing = await db.monthlyBudgets.where({ categoryId: editId, month: currentMonthStr }).first();
+        const existing = await db.monthlyBudgets
+          .where('categoryId').equals(editId)
+          .and(b => b.month === currentMonthStr)
+          .first();
         if (existing) await db.monthlyBudgets.delete(existing.id);
       }
     } else {
