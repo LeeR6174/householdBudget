@@ -5,6 +5,7 @@ import { ChevronLeft } from 'lucide-react';
 import { db } from '../db/db';
 
 export default function AddTransactionPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
 
