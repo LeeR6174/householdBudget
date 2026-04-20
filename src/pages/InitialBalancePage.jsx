@@ -60,7 +60,8 @@ export default function InitialBalancePage() {
         {assets.filter(a => a.type !== 'credit').map(asset => (
           <div key={asset.id} className="form-group mb-md">
             <label className="form-label text-sm text-secondary font-bold">
-              {asset.type === 'cash' ? '💵 ' : '🏦 '} {asset.name}の現在残高
+              {asset.type === 'cash' ? '💵 ' : '🏦 '} {asset.name} 
+              {' の現在残高'}
             </label>
             <div className="flex-center">
               <input 
