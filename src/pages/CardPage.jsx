@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -7,20 +8,37 @@ import { Check, Clock } from 'lucide-react';
 const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) => {
   const [tx, setTx] = useState(0);
   const startX = useRef(null);
+  const startY = useRef(null);
   const isScrolling = useRef(false);
+  const isSwiping = useRef(false);
 
   const handleTouchStart = (e) => { 
     startX.current = e.touches[0].clientX; 
+    startY.current = e.touches[0].clientY;
     isScrolling.current = false;
+    isSwiping.current = false;
   };
   
   const handleTouchMove = (e) => {
-    if (startX.current === null) return;
+    if (startX.current === null || isScrolling.current) return;
+    
     const diffX = e.touches[0].clientX - startX.current;
+    const diffY = e.touches[0].clientY - startY.current;
     
-    // 縦スクロールと横スワイプの判定（簡易）
-    if (Math.abs(diffX) < 10 && !isScrolling.current) return;
+    // 最初にどちらの動きが強いかでスクロールかスワイプかを決定
+    if (!isSwiping.current && !isScrolling.current) {
+      if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 5) {
+        isScrolling.current = true;
+        return;
+      }
+      if (Math.abs(diffX) > 5) {
+        isSwiping.current = true;
+      }
+    }
+
+    if (isScrolling.current) return;
     
+    e.preventDefault(); // スワイプ中はスクロールを止める
     if (diffX > 120) setTx(120);
     else if (diffX < -120) setTx(-120);
     else setTx(diffX);
@@ -79,6 +97,7 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) =>
 };
 
 export default function CardPage() {
+  const navigate = useNavigate();
   const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
   const categories = useLiveQuery(() => db.categories.toArray()) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
@@ -133,7 +152,16 @@ export default function CardPage() {
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
-      <div className="page-title">💳 カード支払い管理</div>
+      <div className="flex-between mb-lg">
+        <div className="page-title" style={{ marginBottom: 0 }}>💳 カード支払い管理</div>
+        <button 
+          className="btn btn-primary" 
+          onClick={() => navigate('/settings/ai-import')}
+          style={{ width: 'auto', padding: '8px 16px', fontSize: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}
+        >
+          ✨ AIインポート
+        </button>
+      </div>
 
       <div className="card mb-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>
         <h3 className="text-sm opacity-90 mb-sm">次回（今月）引き落とし確定額</h3>

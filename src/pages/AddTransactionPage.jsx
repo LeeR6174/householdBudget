@@ -49,6 +49,11 @@ export default function AddTransactionPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (isEditing && !existingTx) {
+      alert('データの読み込み中です。少々お待ちください。');
+      return;
+    }
+
     if (!amount || amount <= 0) {
       alert('金額を正しく入力してください');
       return;
@@ -62,7 +67,7 @@ export default function AddTransactionPage() {
         content,
         memo,
         date,
-        createdAt: isEditing ? existingTx.createdAt : new Date().toISOString()
+        createdAt: isEditing ? (existingTx?.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
       if (type === 'transfer') {
@@ -87,9 +92,9 @@ export default function AddTransactionPage() {
         // もしクレジットカード払いなら未確定状態にする
         const selectedAsset = assets.find(a => a.id === assetId);
         if (selectedAsset && selectedAsset.type === 'credit') {
-          baseTx.cardStatus = isEditing ? existingTx.cardStatus : 'unconfirmed';
+          baseTx.cardStatus = isEditing ? (existingTx?.cardStatus || 'unconfirmed') : 'unconfirmed';
         } else {
-          baseTx.cardStatus = isEditing ? existingTx.cardStatus : undefined;
+          baseTx.cardStatus = isEditing ? existingTx?.cardStatus : undefined;
         }
       }
 

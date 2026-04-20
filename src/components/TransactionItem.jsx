@@ -17,23 +17,21 @@ export default function TransactionItem({ transaction, categories, assets, onCli
       <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
         <div className="flex-center gap-md">
           <div 
-            style={{ backgroundColor: '#e5e7eb', color: '#4b5563' }}
-            className="w-10 h-10 rounded-full flex-center font-bold text-xs"
+            style={{ backgroundColor: '#e2e8f0', color: '#475569' }}
+            className="w-10 h-10 rounded-full flex-center font-bold text-xs flex-shrink-0"
           >
             振替
           </div>
-          <div>
-            <div className="font-semibold flex-center gap-sm text-sm">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold flex items-center gap-sm text-sm truncate">
               <span>{fromAsset?.name || '不明'}</span>
               <ArrowRight size={14} className="text-secondary" />
               <span>{toAsset?.name || '不明'}</span>
             </div>
-            <div className="text-xs text-secondary flex-col gap-xs mt-xs">
+            <div className="text-xs text-secondary flex flex-col mt-0.5">
               <span>{formatDate(transaction.date)}</span>
-              {(transaction.content || transaction.memo) && (
-                <span className="text-primary truncate" style={{ maxWidth: '180px' }}>
-                  {transaction.content} {transaction.memo ? `(${transaction.memo})` : ''}
-                </span>
+              {transaction.content && (
+                <span className="text-primary truncate">{transaction.content}</span>
               )}
             </div>
           </div>
@@ -51,24 +49,21 @@ export default function TransactionItem({ transaction, categories, assets, onCli
       <div className="flex-center gap-md">
         <div 
           style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff' }}
-          className="w-10 h-10 rounded-full flex-center font-bold"
+          className="w-10 h-10 rounded-full flex-center font-bold flex-shrink-0"
         >
           {category?.name?.[0] || '?'}
         </div>
-        <div>
-          <div className="font-semibold flex-center gap-sm">
-            <span>{category?.name || '不明'}</span>
-            <span className="text-xs px-2 py-1 rounded-full text-secondary" style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 8px' }}>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold flex items-center gap-sm flex-wrap">
+            <span className="truncate">{transaction.content || category?.name || '不明'}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full text-secondary font-normal" style={{ backgroundColor: 'rgba(0,0,0,0.05)', whiteSpace: 'nowrap' }}>
               {asset?.name || '不明資産'}
             </span>
           </div>
-          <div className="text-xs text-secondary flex-col gap-xs mt-xs">
+          <div className="text-xs text-secondary flex flex-col mt-0.5">
             <span>{formatDate(transaction.date)}</span>
-            {(transaction.content || transaction.memo) && (
-              <span className="truncate" style={{ maxWidth: '180px' }}>
-                <span className="text-primary">{transaction.content}</span>
-                {transaction.memo && ` • ${transaction.memo}`}
-              </span>
+            {transaction.memo && (
+              <span className="truncate text-primary">{transaction.memo}</span>
             )}
           </div>
         </div>
