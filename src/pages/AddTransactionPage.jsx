@@ -109,26 +109,27 @@ export default function AddTransactionPage() {
     }
   };
 
-  // Loading guard for edit mode
-  if (isEditing && existingTx === undefined) {
-    return (
-      <div className="page-container flex-center" style={{ minHeight: '80vh' }}>
-        <div className="text-secondary font-bold">読み込み中...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="flex gap-sm items-center mb-lg">
-        <button className="btn-back" onClick={() => navigate(-1)}>
+        <button 
+          className="btn-back" 
+          onClick={() => navigate(-1)}
+          style={{ position: 'relative', zIndex: 100 }}
+        >
           <ChevronLeft size={24} />
           <span>戻る</span>
         </button>
         <div className="page-title" style={{ marginBottom: 0 }}>{isEditing ? '記録の編集' : '記録の追加'}</div>
       </div>
-      
-      <div className="toggle-group" style={{ display: 'flex', gap: '4px' }}>
+
+      {isEditing && existingTx === undefined ? (
+        <div className="flex-center" style={{ minHeight: '50vh' }}>
+          <div className="text-secondary font-bold">データを読み込み中...</div>
+        </div>
+      ) : (
+        <>
+          <div className="toggle-group" style={{ display: 'flex', gap: '4px' }}>
         <button 
           className={`toggle-btn expense ${type === 'expense' ? 'active' : ''}`}
           onClick={() => setType('expense')}
@@ -247,6 +248,8 @@ export default function AddTransactionPage() {
           {isEditing ? '更新する' : '保存する'}
         </button>
       </form>
+      </>
+      )}
     </div>
   );
 }
