@@ -9,6 +9,7 @@ import { formatCurrency } from '../utils/format';
 export default function SettingsPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const backupInputRef = useRef(null);
 
   const settings = useLiveQuery(() => db.settings.get('master'));
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
@@ -146,13 +147,90 @@ export default function SettingsPage() {
     }
   };
 
-  const handleExportJson = async () => {
-    const transactions = await db.transactions.toArray();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(transactions));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `kakeibo_data_${new Date().toISOString().split('T')[0]}.json`);
-    dlAnchorElem.click();
+  const handleExportFullBackup = async () => {
+    try {
+      const [transactions, categories, assets, settings, monthlySettings, monthlyBudgets] = await Promise.all([
+        db.transactions.toArray(),
+        db.categories.toArray(),
+        db.assets.toArray(),
+        db.settings.toArray(),
+        db.monthlySettings.toArray(),
+        db.monthlyBudgets.toArray()
+      ]);
+
+      const backupData = {
+        version: 1,
+        timestamp: new Date().toISOString(),
+        transactions,
+        categories,
+        assets,
+        settings,
+        monthlySettings,
+        monthlyBudgets
+      };
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `kakeibo_full_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('バックアップの作成に失敗しました。');
+    }
+  };
+
+  const handleImportFullBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm('【警告】バックアップを復元すると、現在のデータはすべて上書き（削除）されます。よろしいですか？')) {
+      backupInputRef.current.value = null;
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        
+        // バリデーション（簡易）
+        if (!data.transactions || !data.categories || !data.assets) {
+          throw new Error('無効なバックアップファイルです。');
+        }
+
+        await db.transaction('rw', [db.transactions, db.categories, db.assets, db.settings, db.monthlySettings, db.monthlyBudgets], async () => {
+          await Promise.all([
+            db.transactions.clear(),
+            db.categories.clear(),
+            db.assets.clear(),
+            db.settings.clear(),
+            db.monthlySettings.clear(),
+            db.monthlyBudgets.clear()
+          ]);
+
+          await Promise.all([
+            db.transactions.bulkAdd(data.transactions),
+            db.categories.bulkAdd(data.categories),
+            db.assets.bulkAdd(data.assets),
+            db.settings.bulkAdd(data.settings),
+            db.monthlySettings.bulkAdd(data.monthlySettings),
+            db.monthlyBudgets.bulkAdd(data.monthlyBudgets)
+          ]);
+        });
+
+        alert('復元が完了しました！アプリを再起動します。');
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        alert('復元に失敗しました。ファイルが壊れているか、形式が正しくありません。');
+      } finally {
+        backupInputRef.current.value = null;
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleExportXlsx = async () => { /* 前回同様のため割愛しますが、必要なら後で追加します。いったんは表示だけ */ };
@@ -226,10 +304,24 @@ export default function SettingsPage() {
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
-        <h3 className="font-bold mb-md">データのエクスポート</h3>
+        <h3 className="font-bold mb-md">データのバックアップと復元</h3>
+        <p className="text-sm text-secondary mb-md">
+          アプリの全てのデータを1つのファイルとして保存・復元します。<br/>
+          機種変更や、ホーム画面アイコンの追加時などの引き継ぎに使います。
+        </p>
         <div className="flex gap-md mb-lg">
-          <button className="btn btn-outline w-full" onClick={handleExportJson}>JSON出力</button>
+          <button className="btn btn-primary w-full" onClick={handleExportFullBackup}>
+            全データをバックアップ
+          </button>
+          <button className="btn btn-outline w-full font-bold" onClick={() => backupInputRef.current?.click()}>
+            バックアップから復元
+          </button>
+          <input type="file" accept=".json" ref={backupInputRef} onChange={handleImportFullBackup} style={{ display: 'none' }} />
         </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
+
+        <h3 className="font-bold mb-md">Excel・外部連携</h3>
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
