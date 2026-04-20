@@ -57,21 +57,19 @@ export default function InitialBalancePage() {
 
         <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px dashed var(--border-color)' }} />
 
-        {assets.map(asset => (
+        {assets.filter(a => a.type !== 'credit').map(asset => (
           <div key={asset.id} className="form-group mb-md">
             <label className="form-label text-sm text-secondary font-bold">
-              {asset.type === 'credit' ? '💳 ' : '🏦 '} {asset.name} 
-              {asset.type === 'credit' ? 'の初期未払金' : 'の現在残高'}
+              {asset.type === 'cash' ? '💵 ' : '🏦 '} {asset.name}の現在残高
             </label>
             <div className="flex-center">
               <input 
                 type="number" 
                 inputMode="numeric"
                 className="form-control" 
-                value={asset.type === 'credit' && asset.initialBalance ? Math.abs(asset.initialBalance) : (asset.initialBalance || '')} 
+                value={asset.initialBalance || ''} 
                 onChange={(e) => handleUpdateAsset(asset.id, e.target.value, asset.type)} 
                 placeholder="0"
-                style={{ color: asset.type === 'credit' ? 'var(--danger-color)' : 'inherit' }}
               />
               <span className="ml-sm font-bold">円</span>
             </div>
