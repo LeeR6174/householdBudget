@@ -14,6 +14,8 @@ export default function SettingsPage() {
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const currentMonthStr = getCurrentBudgetMonth();
   const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonthStr), [currentMonthStr]);
+  const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
+  const initialSavings = settings?.targetSavings || 0;
 
   const handleUpdateAsset = async (id, value) => {
     await db.assets.update(id, { initialBalance: Number(value) || 0 });
@@ -160,22 +162,25 @@ export default function SettingsPage() {
       <div className="page-title">設定</div>
 
       <div className="card mb-lg" style={{ border: '2px solid var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.02)' }}>
-        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)' }}>🐷 貯金確保額の設定</h3>
+        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)' }}>🐷 今月の積み立て額の設定</h3>
         <p className="text-sm text-secondary mb-md">
-          「家用・将来用」として触らないお金を設定します。<br/>
-          <b>{currentMonthStr}</b> 以降の「使えるお金」に反映されます。
+          <b>{currentMonthStr}</b> に追加で貯める額を入力します。<br/>
+          これまでの累計額が「貯金総額」として資産からよけられます。
         </p>
-        <div className="flex-center gap-md">
+        <div className="flex-center gap-md mb-md">
           <input 
             type="number" 
             inputMode="numeric" 
             className="form-control" 
-            value={monthlySettings?.targetSavings ?? settings?.targetSavings ?? ''} 
+            value={monthlySettings?.targetSavings ?? ''} 
             onChange={(e) => handleUpdateMonthlySavings(e.target.value)}
             placeholder="0"
             style={{ fontSize: '1.25rem', fontWeight: 'bold', textAlign: 'right' }}
           />
           <span className="font-bold">円</span>
+        </div>
+        <div className="text-right text-sm font-bold text-primary">
+          現在の貯金総額: {formatCurrency(initialSavings + (allMonthlySettings.filter(s => s.month <= currentMonthStr).reduce((sum, s) => sum + s.targetSavings, 0)))}
         </div>
       </div>
 

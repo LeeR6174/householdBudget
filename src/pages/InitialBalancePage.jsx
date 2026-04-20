@@ -17,7 +17,7 @@ export default function InitialBalancePage() {
     await db.assets.update(id, { initialBalance: num });
   };
 
-  const handleUpdateSavings = async (value) => {
+  const handleUpdateTargetSavings = async (value) => {
     if (settings) {
       await db.settings.update('master', { targetSavings: Number(value) || 0 });
     }
@@ -33,22 +33,22 @@ export default function InitialBalancePage() {
         <div className="page-title" style={{ marginBottom: 0 }}>初期残高・貯金設定</div>
       </div>
 
-      <div className="card mb-lg">
-        <p className="text-sm text-secondary mb-md">
-          ※ 実際の通帳残高や、家用のための「触らない貯金」を入力してください。<br/>
-          （通常は使い始めた最初だけ設定し、運用中は変更しないことを推奨します）
+      <div className="card">
+        <h3 className="font-bold mb-md">初期貯金の設定</h3>
+        <p className="text-sm text-secondary mb-lg">
+          アプリ開始時に既に持っている「貯蓄用のお金」を入力してください。
         </p>
 
-        <div className="form-group mb-lg">
-          <label className="form-label text-sm text-secondary font-bold">🐷 貯金確保額（自由に使えないお金）</label>
+        <div className="form-group mb-xl">
+          <label className="form-label text-sm text-secondary font-bold">🐷 初期貯金額</label>
           <div className="flex-center">
             <input 
               type="number" 
-              inputMode="numeric"
+              inputMode="numeric" 
               className="form-control" 
               value={settings?.targetSavings || ''} 
-              onChange={(e) => handleUpdateSavings(e.target.value)} 
-              placeholder="0" 
+              onChange={(e) => handleUpdateTargetSavings(e.target.value)} 
+              placeholder="0"
               style={{ fontWeight: 'bold' }}
             />
             <span className="ml-sm font-bold">円</span>

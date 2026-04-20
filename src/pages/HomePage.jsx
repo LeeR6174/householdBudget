@@ -60,17 +60,16 @@ export default function HomePage() {
   // 未払い総額 (マイナス残高の絶対値、UI表示用)
   const unpaidTotal = creditBalance < 0 ? Math.abs(creditBalance) : 0;
 
-  // --- 貯金確保額の解決 (指定月 -> なければ過去の最新 -> なければマスター) ---
-  let targetSavings = settings?.targetSavings || 0;
-  if (monthlySettings) {
-    targetSavings = monthlySettings.targetSavings;
-  } else {
-    const prevs = allMonthlySettings.filter(s => s.month < currentMonth).sort((a,b) => b.month.localeCompare(a.month));
-    if (prevs.length > 0) targetSavings = prevs[0].targetSavings;
-  }
+  // --- 貯金確保額の解決 (初期貯金額 + 現在の月までの累計積み立て額) ---
+  const initialSavings = settings?.targetSavings || 0;
+  const accumulatedSavings = allMonthlySettings
+    .filter(s => s.month <= currentMonth)
+    .reduce((sum, s) => sum + s.targetSavings, 0);
+  
+  const totalSavings = initialSavings + accumulatedSavings;
 
   // 本当の意味で使えるお金 (手元資金 + クレカ残高(通常マイナス) - 貯金確保額)
-  const netWorth = realBalance + creditBalance - targetSavings;
+  const netWorth = realBalance + creditBalance - totalSavings;
 
   // --- 今月の収支計算 (カード払いは利用月としてそのまま計上) ---
   let income = 0;
@@ -127,8 +126,8 @@ export default function HomePage() {
         </div>
 
         <div className="flex-between pb-sm" style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', position: 'relative', zIndex: 1 }}>
-          <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>🐷 貯金確保額</div>
-          <div className="font-bold text-lg" style={{ color: '#818cf8' }}>-{formatCurrency(targetSavings)}</div>
+          <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>🐷 貯金総額</div>
+          <div className="font-bold text-lg" style={{ color: '#818cf8' }}>-{formatCurrency(totalSavings)}</div>
         </div>
 
         <div className="flex-between pt-md" style={{ position: 'relative', zIndex: 1 }}>
