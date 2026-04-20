@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2 } from 'lucide-react';
 import { db } from '../db/db';
@@ -7,6 +8,7 @@ import MonthSelector from '../components/MonthSelector';
 import TransactionItem from '../components/TransactionItem';
 
 export default function HistoryPage() {
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
   const { startDate, endDate } = getMonthRange(currentMonth);
 
@@ -35,7 +37,12 @@ export default function HistoryPage() {
         {transactions.map(tx => (
           <div key={tx.id} style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
-              <TransactionItem transaction={tx} categories={categories} assets={assets} />
+              <TransactionItem 
+                transaction={tx} 
+                categories={categories} 
+                assets={assets} 
+                onClick={() => navigate(`/edit/${tx.id}`)}
+              />
             </div>
             <button 
               onClick={() => handleDelete(tx.id)}

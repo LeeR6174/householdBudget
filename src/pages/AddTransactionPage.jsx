@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft } from 'lucide-react';
 import { db } from '../db/db';
 
 export default function AddTransactionPage() {
-  const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = !!id;
+
   const [type, setType] = useState('expense'); // 'expense' | 'income' | 'transfer'
   
   const [amount, setAmount] = useState('');
@@ -18,6 +20,26 @@ export default function AddTransactionPage() {
   const [content, setContent] = useState('');
   const [memo, setMemo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Fetch existing transaction if editing
+  const existingTx = useLiveQuery(async () => {
+    if (!id) return null;
+    return await db.transactions.get(id);
+  }, [id]);
+
+  React.useEffect(() => {
+    if (existingTx) {
+      setType(existingTx.type);
+      setAmount(existingTx.amount.toString());
+      setCategoryId(existingTx.categoryId || '');
+      setAssetId(existingTx.assetId || '');
+      setFromAssetId(existingTx.fromAssetId || '');
+      setToAssetId(existingTx.toAssetId || '');
+      setContent(existingTx.content || '');
+      setMemo(existingTx.memo || '');
+      setDate(existingTx.date);
+    }
+  }, [existingTx]);
 
   const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
@@ -34,13 +56,13 @@ export default function AddTransactionPage() {
 
     try {
       const baseTx = {
-        id: crypto.randomUUID(),
+        id: isEditing ? id : crypto.randomUUID(),
         type,
         amount: Number(amount),
         content,
         memo,
         date,
-        createdAt: new Date().toISOString()
+        createdAt: isEditing ? existingTx.createdAt : new Date().toISOString()
       };
 
       if (type === 'transfer') {
@@ -65,12 +87,14 @@ export default function AddTransactionPage() {
         // もしクレジットカード払いなら未確定状態にする
         const selectedAsset = assets.find(a => a.id === assetId);
         if (selectedAsset && selectedAsset.type === 'credit') {
-          baseTx.cardStatus = 'unconfirmed';
+          baseTx.cardStatus = isEditing ? existingTx.cardStatus : 'unconfirmed';
+        } else {
+          baseTx.cardStatus = isEditing ? existingTx.cardStatus : undefined;
         }
       }
 
-      await db.transactions.add(baseTx);
-      navigate('/');
+      await db.transactions.put(baseTx);
+      navigate(-1); // Go back
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -84,7 +108,7 @@ export default function AddTransactionPage() {
           <ChevronLeft size={20} />
           <span className="font-bold">戻る</span>
         </button>
-        <div className="page-title" style={{ marginBottom: 0 }}>記録の追加</div>
+        <div className="page-title" style={{ marginBottom: 0 }}>{isEditing ? '記録の編集' : '記録の追加'}</div>
       </div>
       
       <div className="toggle-group" style={{ display: 'flex', gap: '4px' }}>
@@ -203,7 +227,7 @@ export default function AddTransactionPage() {
         </div>
 
         <button type="submit" className="btn btn-primary w-full shadow-lg text-lg py-3">
-          保存する
+          {isEditing ? '更新する' : '保存する'}
         </button>
       </form>
     </div>

@@ -1,8 +1,8 @@
 import React from 'react';
 import { formatCurrency } from '../utils/format';
 
-export default function BudgetProgressBar({ category, spent }) {
-  const limit = category.monthlyLimit || 0;
+export default function BudgetProgressBar({ category, spent, limit: propLimit }) {
+  const limit = propLimit !== undefined ? propLimit : (category.monthlyLimit || 0);
   const isUnbudgeted = limit === 0;
   
   const percentage = isUnbudgeted ? 0 : Math.min((spent / limit) * 100, 100);

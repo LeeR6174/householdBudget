@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import * as XLSX from 'xlsx';
 import { db, resetDB } from '../db/db';
+import { getCurrentBudgetMonth } from '../utils/dateUtils';
+import { formatCurrency } from '../utils/format';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -10,15 +12,16 @@ export default function SettingsPage() {
 
   const settings = useLiveQuery(() => db.settings.get('master'));
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const currentMonthStr = getCurrentBudgetMonth();
+  const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonthStr), [currentMonthStr]);
 
   const handleUpdateAsset = async (id, value) => {
     await db.assets.update(id, { initialBalance: Number(value) || 0 });
   };
 
-  const handleUpdateSavings = async (value) => {
-    if (settings) {
-      await db.settings.update('master', { targetSavings: Number(value) || 0 });
-    }
+  const handleUpdateMonthlySavings = async (value) => {
+    const amount = Number(value) || 0;
+    await db.monthlySettings.put({ month: currentMonthStr, targetSavings: amount });
   };
 
   const handleReset = async () => {
@@ -155,6 +158,26 @@ export default function SettingsPage() {
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="page-title">設定</div>
+
+      <div className="card mb-lg" style={{ border: '2px solid var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.02)' }}>
+        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)' }}>🐷 貯金確保額の設定</h3>
+        <p className="text-sm text-secondary mb-md">
+          「家用・将来用」として触らないお金を設定します。<br/>
+          <b>{currentMonthStr}</b> 以降の「使えるお金」に反映されます。
+        </p>
+        <div className="flex-center gap-md">
+          <input 
+            type="number" 
+            inputMode="numeric" 
+            className="form-control" 
+            value={monthlySettings?.targetSavings ?? settings?.targetSavings ?? ''} 
+            onChange={(e) => handleUpdateMonthlySavings(e.target.value)}
+            placeholder="0"
+            style={{ fontSize: '1.25rem', fontWeight: 'bold', textAlign: 'right' }}
+          />
+          <span className="font-bold">円</span>
+        </div>
+      </div>
 
       <div className="card mb-lg">
         <h3 className="font-bold mb-md">マスターデータ管理</h3>

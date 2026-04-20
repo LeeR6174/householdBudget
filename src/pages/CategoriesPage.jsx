@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Trash2, Edit2, Plus } from 'lucide-react';
 import { db } from '../db/db';
+import { getCurrentBudgetMonth } from '../utils/dateUtils';
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
+  const formRef = useRef(null);
   const categories = useLiveQuery(() => db.categories.toArray()) || [];
   
   const [isEditing, setIsEditing] = useState(false);
@@ -16,6 +18,22 @@ export default function CategoriesPage() {
   const [type, setType] = useState('expense');
   const [color, setColor] = useState('#9ca3af');
   const [monthlyLimit, setMonthlyLimit] = useState('');
+  const [thisMonthBudget, setThisMonthBudget] = useState('');
+  const currentMonthStr = getCurrentBudgetMonth();
+
+  const thisMonthSettings = useLiveQuery(async () => {
+    if (!editId) return null;
+    return await db.monthlyBudgets.where({ categoryId: editId, month: currentMonthStr }).first();
+  }, [editId, currentMonthStr]);
+
+  // Update thisMonthBudget when thisMonthSettings changes
+  React.useEffect(() => {
+    if (thisMonthSettings) {
+      setThisMonthBudget(thisMonthSettings.budget.toString());
+    } else {
+      setThisMonthBudget('');
+    }
+  }, [thisMonthSettings]);
 
   const resetForm = () => {
     setEditId(null);
@@ -23,6 +41,7 @@ export default function CategoriesPage() {
     setType('expense');
     setColor('#9ca3af');
     setMonthlyLimit('');
+    setThisMonthBudget('');
     setIsEditing(false);
   };
 
@@ -33,6 +52,10 @@ export default function CategoriesPage() {
     setColor(cat.color || '#9ca3af');
     setMonthlyLimit(cat.monthlyLimit?.toString() || '');
     setIsEditing(true);
+    
+    // Smooth scroll to top/form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    formRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
@@ -54,9 +77,27 @@ export default function CategoriesPage() {
 
     if (editId) {
       await db.categories.update(editId, catData);
+      // Save monthly budget if specified
+      if (thisMonthBudget !== '') {
+        const existing = await db.monthlyBudgets.where({ categoryId: editId, month: currentMonthStr }).first();
+        if (existing) {
+          await db.monthlyBudgets.update(existing.id, { budget: Number(thisMonthBudget) });
+        } else {
+          await db.monthlyBudgets.add({ categoryId: editId, month: currentMonthStr, budget: Number(thisMonthBudget) });
+        }
+      } else {
+        // Clear if empty
+        const existing = await db.monthlyBudgets.where({ categoryId: editId, month: currentMonthStr }).first();
+        if (existing) await db.monthlyBudgets.delete(existing.id);
+      }
     } else {
-      catData.id = `cat_custom_${Date.now()}`;
+      const newId = `cat_custom_${Date.now()}`;
+      catData.id = newId;
       await db.categories.add(catData);
+      
+      if (thisMonthBudget !== '') {
+        await db.monthlyBudgets.add({ categoryId: newId, month: currentMonthStr, budget: Number(thisMonthBudget) });
+      }
     }
     resetForm();
   };
@@ -97,7 +138,22 @@ export default function CategoriesPage() {
         <div className="page-title" style={{ marginBottom: 0 }}>カテゴリ管理</div>
       </div>
 
-      <div className="card mb-lg">
+      {isEditing && (
+        <div className="card" style={{ 
+          backgroundColor: 'var(--primary-color)', 
+          color: 'white', 
+          padding: '12px', 
+          textAlign: 'center', 
+          marginBottom: '16px',
+          fontWeight: 'bold',
+          borderRadius: '12px',
+          animation: 'pulse 2s infinite'
+        }}>
+          💡 カテゴリ編集モード：上のフォームの内容を修正してください
+        </div>
+      )}
+
+      <div className="card mb-lg" ref={formRef}>
         <h3 className="font-bold mb-md">{isEditing ? 'カテゴリの編集' : '新規カテゴリの追加'}</h3>
         <form onSubmit={handleSave}>
           <div className="form-group">
@@ -120,10 +176,17 @@ export default function CategoriesPage() {
           </div>
 
           {type === 'expense' && (
-            <div className="form-group mb-md">
-              <label className="form-label">月額予算 (円) ※任意</label>
-              <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0" />
-            </div>
+            <>
+              <div className="form-group mb-md">
+                <label className="form-label">基本の月額予算 (円)</label>
+                <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
+              </div>
+              <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                <label className="form-label" style={{ color: 'var(--primary-color)' }}>✨ {currentMonthStr} 限定の予算 (任意)</label>
+                <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder="今月だけ変える場合は入力" style={{ borderColor: 'var(--primary-color-light)' }} />
+                <p className="text-xs text-secondary mt-xs">※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。</p>
+              </div>
+            </>
           )}
 
           <div className="flex gap-sm">

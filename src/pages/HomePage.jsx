@@ -18,6 +18,9 @@ export default function HomePage() {
   const categories = useLiveQuery(() => db.categories.toArray()) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const settings = useLiveQuery(() => db.settings.get('master'));
+  const monthlyBudgets = useLiveQuery(() => db.monthlyBudgets.where('month').equals(currentMonth).toArray(), [currentMonth]) || [];
+  const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonth), [currentMonth]);
+  const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
   
   const currentMonthTx = useLiveQuery(() => {
     return db.transactions
@@ -57,7 +60,15 @@ export default function HomePage() {
   // 未払い総額 (マイナス残高の絶対値、UI表示用)
   const unpaidTotal = creditBalance < 0 ? Math.abs(creditBalance) : 0;
 
-  const targetSavings = settings?.targetSavings || 0;
+  // --- 貯金確保額の解決 (指定月 -> なければ過去の最新 -> なければマスター) ---
+  let targetSavings = settings?.targetSavings || 0;
+  if (monthlySettings) {
+    targetSavings = monthlySettings.targetSavings;
+  } else {
+    const prevs = allMonthlySettings.filter(s => s.month < currentMonth).sort((a,b) => b.month.localeCompare(a.month));
+    if (prevs.length > 0) targetSavings = prevs[0].targetSavings;
+  }
+
   // 本当の意味で使えるお金 (手元資金 + クレカ残高(通常マイナス) - 貯金確保額)
   const netWorth = realBalance + creditBalance - targetSavings;
 
@@ -70,8 +81,18 @@ export default function HomePage() {
     if (t.type === 'income') income += t.amount;
     if (t.type === 'expense') {
       expense += t.amount;
-      expenseByCategory[t.categoryId] = (expenseByCategory[t.categoryId] || 0) + t.amount;
+      expenseByCategory[t.categoryId || 'uncategorized'] = (expenseByCategory[t.categoryId || 'uncategorized'] || 0) + t.amount;
     }
+  });
+
+  // 予算合計の計算
+  const budgetMap = {};
+  monthlyBudgets.forEach(b => budgetMap[b.categoryId] = b.budget);
+  
+  let totalBudget = 0;
+  categories.filter(c => c.type === 'expense').forEach(cat => {
+    const limit = budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0);
+    totalBudget += limit;
   });
 
   const recentTransactions = currentMonthTx.slice(0, 5);
@@ -131,12 +152,42 @@ export default function HomePage() {
 
       <h3 className="font-bold mb-md mt-lg">当月のカテゴリ別予算・支出</h3>
       <div className="card">
-        {categories.filter(c => c.type === 'expense').map(cat => (
-          <BudgetProgressBar key={cat.id} category={cat} spent={expenseByCategory[cat.id] || 0} />
-        ))}
-        {categories.filter(c => c.type === 'expense').length === 0 && (
+        {categories.filter(c => c.type === 'expense').map(cat => {
+          const limit = budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0);
+          return (
+            <BudgetProgressBar 
+              key={cat.id} 
+              category={cat} 
+              spent={expenseByCategory[cat.id] || 0} 
+              limit={limit}
+            />
+          );
+        })}
+        
+        {/* カテゴリ未設定の支出がある場合 */}
+        {expenseByCategory['uncategorized'] > 0 && (
+          <BudgetProgressBar 
+            category={{ name: '未分類・不明', color: '#9ca3af', type: 'expense' }} 
+            spent={expenseByCategory['uncategorized']} 
+            limit={0}
+          />
+        )}
+
+        {categories.filter(c => c.type === 'expense').length === 0 && !expenseByCategory['uncategorized'] && (
           <p className="text-secondary text-sm text-center">カテゴリがありません</p>
         )}
+
+        <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+        
+        <div className="flex-between font-bold text-sm">
+          <span>合計</span>
+          <div>
+            <span className="text-expense">{formatCurrency(expense)}</span>
+            {totalBudget > 0 && (
+              <span className="text-secondary ml-sm">/ {formatCurrency(totalBudget)}</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex-between mb-md mt-lg">
@@ -147,7 +198,13 @@ export default function HomePage() {
       </div>
       <div className="card" style={{ padding: '0 16px' }}>
         {recentTransactions.map(tx => (
-          <TransactionItem key={tx.id} transaction={tx} categories={categories} assets={assets} />
+          <TransactionItem 
+            key={tx.id} 
+            transaction={tx} 
+            categories={categories} 
+            assets={assets} 
+            onClick={() => navigate(`/edit/${tx.id}`)}
+          />
         ))}
         {recentTransactions.length === 0 && (
           <p className="text-secondary text-sm text-center py-md mt-md">履歴がありません</p>

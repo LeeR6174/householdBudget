@@ -112,6 +112,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/add" element={<AddTransactionPage />} />
+          <Route path="/edit/:id" element={<AddTransactionPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/card" element={<CardPage />} />
           <Route path="/analysis" element={<AnalysisPage />} />

@@ -21,9 +21,13 @@ export default function AnalysisPage() {
   // カテゴリ別集計
   const expensesByCategory = {};
   categories.forEach(c => expensesByCategory[c.id] = 0);
+  expensesByCategory['uncategorized'] = 0;
+
   transactions.forEach(tx => {
-    if (expensesByCategory[tx.categoryId] !== undefined) {
+    if (tx.categoryId && expensesByCategory[tx.categoryId] !== undefined) {
       expensesByCategory[tx.categoryId] += tx.amount;
+    } else {
+      expensesByCategory['uncategorized'] += tx.amount;
     }
   });
 
@@ -32,11 +36,21 @@ export default function AnalysisPage() {
     name: cat.name,
     amount: expensesByCategory[cat.id],
     color: cat.color || '#8884d8'
-  }))
-  .filter(d => d.amount > 0) // 0円のカテゴリは省く
-  .sort((a, b) => b.amount - a.amount);
+  }));
 
-  const totalExpense = chartData.reduce((sum, d) => sum + d.amount, 0);
+  if (expensesByCategory['uncategorized'] > 0) {
+    chartData.push({
+      name: '未分類・不明',
+      amount: expensesByCategory['uncategorized'],
+      color: '#9ca3af'
+    });
+  }
+
+  const sortedChartData = chartData
+    .filter(d => d.amount > 0) // 0円のカテゴリは省く
+    .sort((a, b) => b.amount - a.amount);
+
+  const totalExpense = sortedChartData.reduce((sum, d) => sum + d.amount, 0);
 
   // カスタムツールチップ
   const CustomTooltip = ({ active, payload }) => {
@@ -68,7 +82,7 @@ export default function AnalysisPage() {
           <>
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer>
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                <BarChart data={sortedChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                   <YAxis 
@@ -80,7 +94,7 @@ export default function AnalysisPage() {
                   />
                   <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} content={<CustomTooltip />} />
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
+                    {sortedChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Bar>
@@ -90,7 +104,7 @@ export default function AnalysisPage() {
 
             <div className="mt-xl">
               <h4 className="text-sm font-bold text-secondary mb-md">支出内訳</h4>
-              {chartData.map((item, idx) => (
+              {sortedChartData.map((item, idx) => (
                 <div key={idx} className="list-item">
                   <div className="flex-center gap-sm">
                     <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>

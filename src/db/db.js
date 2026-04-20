@@ -11,6 +11,12 @@ db.version(3).stores({
   subscriptions: 'id, dayOfMonth, type, categoryId, assetId, amount, content, memo, lastProcessedMonth'
 });
 
+// version 4: monthly budgets and monthly settings
+db.version(4).stores({
+  monthlyBudgets: '++id, categoryId, month',
+  monthlySettings: 'month'
+});
+
 const DEFAULT_CATEGORIES = [];
 
 const DEFAULT_ASSETS = [
@@ -48,5 +54,7 @@ export const resetDB = async () => {
   await db.assets.clear();
   await db.settings.clear();
   await db.subscriptions.clear();
+  await db.monthlyBudgets.clear();
+  await db.monthlySettings.clear();
   await initDB();
 };

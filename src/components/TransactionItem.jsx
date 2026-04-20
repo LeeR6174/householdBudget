@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 
-export default function TransactionItem({ transaction, categories, assets }) {
+export default function TransactionItem({ transaction, categories, assets, onClick }) {
   const isIncome = transaction.type === 'income';
   const isTransfer = transaction.type === 'transfer';
   
@@ -14,13 +14,13 @@ export default function TransactionItem({ transaction, categories, assets }) {
   // 振替の場合のUI
   if (isTransfer) {
     return (
-      <div className="list-item">
+      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
         <div className="flex-center gap-md">
           <div 
             style={{ backgroundColor: '#e5e7eb', color: '#4b5563' }}
-            className="w-10 h-10 rounded-full flex-center p-sm"
+            className="w-10 h-10 rounded-full flex-center font-bold text-xs"
           >
-            振
+            振替
           </div>
           <div>
             <div className="font-semibold flex-center gap-sm text-sm">
@@ -47,18 +47,18 @@ export default function TransactionItem({ transaction, categories, assets }) {
 
   // 収入・支出のUI
   return (
-    <div className="list-item">
+    <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <div className="flex-center gap-md">
         <div 
-          style={{ backgroundColor: `${category?.color || '#333'}20`, color: category?.color || '#333' }}
-          className="w-10 h-10 rounded-full flex-center p-sm"
+          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff' }}
+          className="w-10 h-10 rounded-full flex-center font-bold"
         >
           {category?.name?.[0] || '?'}
         </div>
         <div>
           <div className="font-semibold flex-center gap-sm">
             <span>{category?.name || '不明'}</span>
-            <span className="text-xs px-2 py-1 bg-gray-100 rounded-full text-secondary" style={{ backgroundColor: 'var(--bg-color)', padding: '2px 6px' }}>
+            <span className="text-xs px-2 py-1 rounded-full text-secondary" style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 8px' }}>
               {asset?.name || '不明資産'}
             </span>
           </div>
