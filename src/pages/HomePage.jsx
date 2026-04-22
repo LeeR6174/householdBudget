@@ -103,15 +103,42 @@ export default function HomePage() {
 
   // 予算合計の計算
   const budgetMap = {};
-  monthlyBudgets.forEach(b => budgetMap[b.categoryId] = b.budget);
-  
-  let totalBudget = 0;
-  categories.filter(c => c.type === 'expense').forEach(cat => {
-    const limit = cat.isCarryover 
-      ? calculateCarryoverBalance(cat, currentMonth, allTx, allMonthlyBudgets) + (expenseByCategory[cat.id] || 0)
-      : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
-    totalBudget += limit;
+  // カテゴリごとにデータを整理（計算高速化のため）
+  const txByCategory = {};
+  allTx.forEach(t => {
+    if (!txByCategory[t.categoryId]) txByCategory[t.categoryId] = [];
+    txByCategory[t.categoryId].push(t);
   });
+  
+  const budgetsByCat = {};
+  allMonthlyBudgets.forEach(b => {
+    if (!budgetsByCat[b.categoryId]) budgetsByCat[b.categoryId] = [];
+    budgetsByCat[b.categoryId].push(b);
+  });
+
+  let totalBudget = 0;
+  let totalNormalBudget = 0;
+  let totalNormalExpense = 0;
+
+  categories.filter(c => c.type === 'expense').forEach(cat => {
+    const spent = expenseByCategory[cat.id] || 0;
+    const catTxs = txByCategory[cat.id] || [];
+    const catBudgets = budgetsByCat[cat.id] || [];
+
+    const limit = cat.isCarryover 
+      ? calculateCarryoverBalance(cat, currentMonth, catTxs, catBudgets) + spent
+      : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
+    
+    totalBudget += limit;
+
+    if (!cat.isCarryover) {
+      totalNormalBudget += limit;
+      totalNormalExpense += spent;
+    }
+  });
+
+  // 未分類は通常支出に含める
+  totalNormalExpense += (expenseByCategory['uncategorized'] || 0);
 
   const recentTransactions = currentMonthTx.slice(0, 5);
 
@@ -196,8 +223,12 @@ export default function HomePage() {
       <h3 className="font-bold mb-md mt-lg">当月のカテゴリ別予算・支出</h3>
       <div className="card">
         {categories.filter(c => c.type === 'expense').map(cat => {
+          const spent = expenseByCategory[cat.id] || 0;
+          const catTxs = txByCategory[cat.id] || [];
+          const catBudgets = budgetsByCat[cat.id] || [];
+
           const limit = cat.isCarryover 
-            ? calculateCarryoverBalance(cat, currentMonth, allTx, allMonthlyBudgets) + (expenseByCategory[cat.id] || 0)
+            ? calculateCarryoverBalance(cat, currentMonth, catTxs, catBudgets) + spent
             : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
             
           return (
@@ -226,12 +257,22 @@ export default function HomePage() {
 
         <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
         
-        <div className="flex-between font-bold text-sm">
-          <span>合計</span>
+        <div className="flex-between font-bold text-sm mb-xs" style={{ color: 'var(--primary-color)' }}>
+          <span>通常支出の合計</span>
           <div>
-            <span className="text-expense">{formatCurrency(expense)}</span>
+            <span className="text-expense">{formatCurrency(totalNormalExpense)}</span>
+            {totalNormalBudget > 0 && (
+              <span className="text-secondary ml-sm" style={{ fontWeight: 'normal' }}>/ {formatCurrency(totalNormalBudget)}</span>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex-between text-xs text-secondary mt-xs" style={{ opacity: 0.8 }}>
+          <span>積立を含む総合計</span>
+          <div>
+            <span>{formatCurrency(expense)}</span>
             {totalBudget > 0 && (
-              <span className="text-secondary ml-sm">/ {formatCurrency(totalBudget)}</span>
+              <span className="ml-sm">/ {formatCurrency(totalBudget)}</span>
             )}
           </div>
         </div>

@@ -174,8 +174,8 @@ export default function CardPage() {
       </div>
 
       {showPayModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowPayModal(false)}>
-          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '480px', margin: '0 auto', borderRadius: '24px 24px 0 0', padding: '24px', animation: 'fadeIn 0.3s' }} onClick={e => e.stopPropagation()}>
+        <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowPayModal(false)}>
+          <div className="animate-slide-up" style={{ backgroundColor: 'white', width: '100%', maxWidth: '480px', margin: '0 auto', borderRadius: '24px 24px 0 0', padding: '24px' }} onClick={e => e.stopPropagation()}>
             <h3 className="font-bold mb-md text-lg">カード支払いの精算</h3>
             <p className="text-sm text-secondary mb-lg">今月確定分（{formatCurrency(confirmedSum)}）をどの口座から引き落としますか？</p>
             

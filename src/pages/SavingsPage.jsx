@@ -11,6 +11,7 @@ export default function SavingsPage() {
   const currentMonthStr = getCurrentBudgetMonth();
   
   const settings = useLiveQuery(() => db.settings.get('master'));
+  const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonthStr), [currentMonthStr]);
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
   const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
   
@@ -28,6 +29,11 @@ export default function SavingsPage() {
     .reduce((sum, r) => sum + (r.amount || 0), 0);
 
   const currentTotalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
+
+  const handleUpdateMonthlySavings = async (value) => {
+    const amount = Number(value) || 0;
+    await db.monthlySettings.put({ month: currentMonthStr, targetSavings: amount });
+  };
 
   const handleAddRecord = async (e) => {
     e.preventDefault();
@@ -66,13 +72,32 @@ export default function SavingsPage() {
         <div className="text-3xl font-bold">{formatCurrency(currentTotalSavings)}</div>
         <div className="mt-md pt-md" style={{ borderTop: '1px solid rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>
           <div className="flex-between mb-xs">
-            <span>初期貯金 + 毎月の積立</span>
+            <span>初期貯金 + 累計積立</span>
             <span>{formatCurrency(initialSavings + monthlyAdditions)}</span>
           </div>
           <div className="flex-between">
             <span>切り崩し累計</span>
             <span style={{ color: '#fecaca' }}>- {formatCurrency(totalDepletions)}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="card mb-lg" style={{ border: '2px solid var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.02)' }}>
+        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)' }}>🐷 {currentMonthStr} の積立額</h3>
+        <p className="text-xs text-secondary mb-md">
+          今月追加で貯金に回す額を設定します。
+        </p>
+        <div className="flex-center gap-md">
+          <input 
+            type="number" 
+            inputMode="numeric" 
+            className="form-control" 
+            value={monthlySettings?.targetSavings ?? ''} 
+            onChange={(e) => handleUpdateMonthlySavings(e.target.value)}
+            placeholder="0"
+            style={{ fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'right' }}
+          />
+          <span className="font-bold text-sm">円</span>
         </div>
       </div>
 

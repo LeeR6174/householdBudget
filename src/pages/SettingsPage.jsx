@@ -22,10 +22,6 @@ export default function SettingsPage() {
     await db.assets.update(id, { initialBalance: Number(value) || 0 });
   };
 
-  const handleUpdateMonthlySavings = async (value) => {
-    const amount = Number(value) || 0;
-    await db.monthlySettings.put({ month: currentMonthStr, targetSavings: amount });
-  };
 
   const handleReset = async () => {
     if (window.confirm('すべての記録と設定が削除されます。本当に初期化しますか？')) {
@@ -256,28 +252,6 @@ export default function SettingsPage() {
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="page-title">設定</div>
 
-      <div className="card mb-lg" style={{ border: '2px solid var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.02)' }}>
-        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)' }}>🐷 今月の積み立て額の設定</h3>
-        <p className="text-sm text-secondary mb-md">
-          <b>{currentMonthStr}</b> に追加で貯める額を入力します。<br/>
-          これまでの累計額が「貯金総額」として資産からよけられます。
-        </p>
-        <div className="flex-center gap-md mb-md">
-          <input 
-            type="number" 
-            inputMode="numeric" 
-            className="form-control" 
-            value={monthlySettings?.targetSavings ?? ''} 
-            onChange={(e) => handleUpdateMonthlySavings(e.target.value)}
-            placeholder="0"
-            style={{ fontSize: '1.25rem', fontWeight: 'bold', textAlign: 'right' }}
-          />
-          <span className="font-bold">円</span>
-        </div>
-        <div className="text-right text-sm font-bold text-primary">
-          現在の貯金総額: {formatCurrency(initialSavings + (allMonthlySettings.filter(s => s.month <= currentMonthStr).reduce((sum, s) => sum + s.targetSavings, 0)))}
-        </div>
-      </div>
 
       <div className="card mb-lg">
         <h3 className="font-bold mb-md">マスターデータ管理</h3>
