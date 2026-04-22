@@ -195,17 +195,48 @@ export default function CategoriesPage() {
                 <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
               </div>
 
-              <div className="form-group flex items-center gap-sm mb-md p-sm" style={{ backgroundColor: 'rgba(79, 70, 229, 0.05)', borderRadius: '12px', cursor: 'pointer' }} onClick={() => setIsCarryover(!isCarryover)}>
-                <input 
-                  type="checkbox" 
-                  id="carryoverToggle"
-                  checked={isCarryover}
-                  onChange={(e) => setIsCarryover(e.target.checked)}
-                  style={{ width: '20px', height: '20px' }}
-                />
-                <label htmlFor="carryoverToggle" style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--primary-color)', cursor: 'pointer' }}>
-                  予算を翌月に繰り越す（積立型）
-                </label>
+              <div 
+                className="form-group flex-between mb-md p-md" 
+                style={{ 
+                  backgroundColor: isCarryover ? 'rgba(79, 70, 229, 0.1)' : 'rgba(0,0,0,0.03)', 
+                  borderRadius: '16px', 
+                  cursor: 'pointer',
+                  border: isCarryover ? '1px solid var(--primary-color-light)' : '1px solid transparent',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }} 
+                onClick={() => setIsCarryover(!isCarryover)}
+              >
+                <div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: '700', color: isCarryover ? 'var(--primary-color)' : 'var(--text-primary)' }}>
+                    予算を翌月に繰り越す（積立型）
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    使わなかった分が翌月に加算されます
+                  </div>
+                </div>
+                <div style={{ 
+                  width: '44px', 
+                  height: '24px', 
+                  backgroundColor: isCarryover ? 'var(--primary-color)' : '#cbd5e1', 
+                  borderRadius: '12px', 
+                  position: 'relative',
+                  transition: 'background-color 0.2s',
+                  flexShrink: 0
+                }}>
+                  <div style={{ 
+                    width: '18px', 
+                    height: '18px', 
+                    backgroundColor: 'white', 
+                    borderRadius: '50%', 
+                    position: 'absolute', 
+                    top: '3px', 
+                    left: isCarryover ? '23px' : '3px',
+                    transition: 'left 0.2s'
+                  }}></div>
+                </div>
               </div>
 
               <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>

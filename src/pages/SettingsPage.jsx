@@ -235,6 +235,23 @@ export default function SettingsPage() {
 
   const handleExportXlsx = async () => { /* 前回同様のため割愛しますが、必要なら後で追加します。いったんは表示だけ */ };
 
+  const handleTestNotification = async () => {
+    if (!('Notification' in window)) {
+      alert('このブラウザはプッシュ通知をサポートしていません。');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      new Notification('格が違う家計簿', {
+        body: 'プッシュ通知のテスト成功です！✨',
+        icon: '/favicon.png'
+      });
+    } else {
+      alert('通知が許可されませんでした。ブラウザの設定から許可してください。');
+    }
+  };
+
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="page-title">設定</div>
@@ -269,6 +286,13 @@ export default function SettingsPage() {
           <p className="text-sm text-secondary mb-sm">家計簿のカテゴリ（分類）を追加・編集・削除します。</p>
           <button className="btn btn-primary w-full" onClick={() => navigate('/settings/categories')}>
             カテゴリ管理
+          </button>
+        </div>
+
+        <div className="form-group mb-lg">
+          <p className="text-sm text-secondary mb-sm">貯金の積立や、大きな買い物のための「切り崩し」を記録します。</p>
+          <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/savings')} style={{ borderColor: 'var(--primary-color)' }}>
+            💰 貯金・切り崩し管理
           </button>
         </div>
 
@@ -322,6 +346,14 @@ export default function SettingsPage() {
         <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
         <h3 className="font-bold mb-md">Excel・外部連携</h3>
+
+        <h3 className="font-bold mb-md">通知設定</h3>
+        <p className="text-sm text-secondary mb-md">
+          リマインドや通知が届くか確認します。
+        </p>
+        <button className="btn btn-outline w-full mb-lg font-bold" onClick={handleTestNotification}>
+          🔔 プッシュ通知のテストを行う
+        </button>
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 

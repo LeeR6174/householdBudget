@@ -45,8 +45,11 @@ export default function BudgetProgressBar({ category, spent, limit: propLimit, i
               style={{ width: `${percentage}%`, backgroundColor: barColor }}
             ></div>
           </div>
-          <div className="text-right text-xs mt-xs text-secondary font-semibold">
-            {displayPercentage.toFixed(1)}%
+          <div className="flex-between text-xs mt-xs text-secondary font-semibold">
+            <span>{displayPercentage.toFixed(1)}%</span>
+            <span style={{ color: limit - spent < 0 ? 'var(--expense-color)' : 'inherit' }}>
+              {limit - spent < 0 ? `予算超過: ${formatCurrency(Math.abs(limit - spent))}` : `残金: ${formatCurrency(limit - spent)}`}
+            </span>
           </div>
         </>
       ) : (

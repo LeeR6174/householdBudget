@@ -23,6 +23,7 @@ export default function HomePage() {
   const allMonthlyBudgets = useLiveQuery(() => db.monthlyBudgets.toArray()) || [];
   const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonth), [currentMonth]);
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
+  const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
   
   const currentMonthTx = useLiveQuery(() => {
     return db.transactions
@@ -50,9 +51,15 @@ export default function HomePage() {
   });
 
   // 手元実資産 (銀行＋現金の合計)
-  const realBalance = assets
-    .filter(a => a.type === 'bank' || a.type === 'cash')
+  const bankBalance = assets
+    .filter(a => a.type === 'bank')
     .reduce((sum, a) => sum + (assetBalances[a.id] || 0), 0);
+
+  const cashBalance = assets
+    .filter(a => a.type === 'cash')
+    .reduce((sum, a) => sum + (assetBalances[a.id] || 0), 0);
+
+  const realBalance = bankBalance + cashBalance;
 
   // クレジットカード残高合計
   const creditBalance = assets
@@ -62,15 +69,23 @@ export default function HomePage() {
   // 未払い総額 (マイナス残高の絶対値、UI表示用)
   const unpaidTotal = creditBalance < 0 ? Math.abs(creditBalance) : 0;
 
-  // --- 貯金確保額の解決 (初期貯金額 + 現在の月までの累計積み立て額) ---
+  // --- 貯金確保額の解決 ---
   const initialSavings = settings?.targetSavings || 0;
-  const accumulatedSavings = allMonthlySettings
+  const monthlyAdditions = allMonthlySettings
     .filter(s => s.month <= currentMonth)
-    .reduce((sum, s) => sum + s.targetSavings, 0);
+    .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
   
-  const totalSavings = initialSavings + accumulatedSavings;
+  const totalDepletions = savingsRecords
+    .filter(r => r.type === 'depletion' && r.month <= currentMonth)
+    .reduce((sum, r) => sum + (r.amount || 0), 0);
+  
+  const extraAdditions = savingsRecords
+    .filter(r => r.type === 'addition' && r.month <= currentMonth)
+    .reduce((sum, r) => sum + (r.amount || 0), 0);
 
-  // 本当の意味で使えるお金 (手元資金 + クレカ残高(通常マイナス) - 貯金確保額)
+  const totalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
+
+  // 本当の意味で使えるお金 (手元資金 + クレカ負債 - 貯金確保額)
   const netWorth = realBalance + creditBalance - totalSavings;
 
   // --- 今月の収支計算 (カード払いは利用月としてそのまま計上) ---
@@ -132,9 +147,21 @@ export default function HomePage() {
         {/* Decorative background circle */}
         <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', blur: '20px' }}></div>
         
-        <div className="flex-between mb-sm" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>🏦 口座残高（手元資金）</div>
-          <div className="font-bold text-lg" style={{ color: '#fff' }}>{formatCurrency(realBalance)}</div>
+        <div className="mb-md" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="flex-between">
+            <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>🏦 銀行・現金（手元資金）</div>
+            <div className="font-bold text-lg" style={{ color: '#fff' }}>{formatCurrency(realBalance)}</div>
+          </div>
+          <div className="flex gap-md mt-xs" style={{ opacity: 0.8 }}>
+            <div className="text-xs">
+              <span style={{ color: 'rgba(255,255,255,0.6)' }}>銀行: </span>
+              <span className="font-bold" style={{ color: '#fff' }}>{formatCurrency(bankBalance)}</span>
+            </div>
+            <div className="text-xs">
+              <span style={{ color: 'rgba(255,255,255,0.6)' }}>現金: </span>
+              <span className="font-bold" style={{ color: '#fff' }}>{formatCurrency(cashBalance)}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex-between mb-sm" style={{ position: 'relative', zIndex: 1 }}>
