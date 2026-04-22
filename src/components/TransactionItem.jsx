@@ -14,29 +14,29 @@ export default function TransactionItem({ transaction, categories, assets, onCli
   // 振替の場合のUI
   if (isTransfer) {
     return (
-      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', alignItems: 'center' }}>
+      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
         <div className="flex items-center gap-md flex-1 min-w-0">
           <div 
-            style={{ backgroundColor: '#e2e8f0', color: '#475569', border: '0' }}
-            className="w-12 h-12 rounded-full flex-center font-bold text-xs flex-shrink-0"
+            style={{ backgroundColor: '#f1f5f9', color: '#64748b', border: '0' }}
+            className="w-11 h-11 rounded-full flex-center font-bold text-xs flex-shrink-0"
           >
             振替
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="text-xs text-secondary mb-xs">
               {formatDate(transaction.date)}
             </div>
-            <div className="font-bold flex items-center gap-sm text-base truncate">
+            <div className="font-bold flex items-center gap-sm text-base truncate leading-tight">
               <span>{fromAsset?.name || '不明'}</span>
               <ArrowRight size={14} className="text-secondary" />
               <span>{toAsset?.name || '不明'}</span>
             </div>
             {transaction.content && (
-              <div className="text-xs text-secondary truncate mt-xs">{transaction.content}</div>
+              <div className="text-xs text-secondary truncate mt-xs opacity-70">{transaction.content}</div>
             )}
           </div>
         </div>
-        <div className="font-bold text-secondary text-right ml-md">
+        <div className="font-bold text-secondary text-right ml-md flex-shrink-0">
           {formatCurrency(transaction.amount)}
         </div>
       </div>
@@ -45,32 +45,32 @@ export default function TransactionItem({ transaction, categories, assets, onCli
 
   // 収入・支出のUI
   return (
-    <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', alignItems: 'center' }}>
+    <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
       <div className="flex items-center gap-md flex-1 min-w-0">
         <div 
-          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff', border: '0' }}
-          className="w-12 h-12 rounded-full flex-center font-bold flex-shrink-0 text-xl"
+          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff', border: '0', fontSize: '1.2rem' }}
+          className="w-11 h-11 rounded-full flex-center font-bold flex-shrink-0"
         >
           {category?.name?.[0] || '?'}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-sm flex-wrap mb-xs">
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center gap-sm mb-xs">
             <span 
               className="category-pill" 
-              style={{ backgroundColor: `${category?.color || '#64748b'}20`, color: category?.color || '#64748b' }}
+              style={{ backgroundColor: `${category?.color || '#64748b'}15`, color: category?.color || '#64748b', fontSize: '0.7rem' }}
             >
               {category?.name || '不明'}
             </span>
-            <span className="text-xs text-secondary truncate" style={{ opacity: 0.8 }}>
-              {asset?.name || '不明資産'}
+            <span className="text-xs text-secondary truncate" style={{ opacity: 0.7 }}>
+              {asset?.name || '不明'}
             </span>
           </div>
-          <div className="font-bold text-base truncate">
-            {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '名称未設定'}
+          <div className="font-bold text-base truncate leading-tight">
+            {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '未設定'}
           </div>
         </div>
       </div>
-      <div className={`font-bold text-lg text-right ml-md ${isIncome ? 'text-income' : 'text-expense'}`}>
+      <div className={`font-bold text-lg text-right ml-md flex-shrink-0 ${isIncome ? 'text-income' : 'text-expense'}`}>
         {isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
       </div>
     </div>

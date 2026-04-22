@@ -8,6 +8,7 @@ import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import TransactionItem from '../components/TransactionItem';
+import { calculateCarryoverBalance } from '../utils/budgetUtils';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function HomePage() {
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const settings = useLiveQuery(() => db.settings.get('master'));
   const monthlyBudgets = useLiveQuery(() => db.monthlyBudgets.where('month').equals(currentMonth).toArray(), [currentMonth]) || [];
+  const allMonthlyBudgets = useLiveQuery(() => db.monthlyBudgets.toArray()) || [];
   const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonth), [currentMonth]);
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
   
@@ -90,7 +92,9 @@ export default function HomePage() {
   
   let totalBudget = 0;
   categories.filter(c => c.type === 'expense').forEach(cat => {
-    const limit = budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0);
+    const limit = cat.isCarryover 
+      ? calculateCarryoverBalance(cat, currentMonth, allTx, allMonthlyBudgets) + (expenseByCategory[cat.id] || 0)
+      : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
     totalBudget += limit;
   });
 
@@ -165,13 +169,17 @@ export default function HomePage() {
       <h3 className="font-bold mb-md mt-lg">当月のカテゴリ別予算・支出</h3>
       <div className="card">
         {categories.filter(c => c.type === 'expense').map(cat => {
-          const limit = budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0);
+          const limit = cat.isCarryover 
+            ? calculateCarryoverBalance(cat, currentMonth, allTx, allMonthlyBudgets) + (expenseByCategory[cat.id] || 0)
+            : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
+            
           return (
             <BudgetProgressBar 
               key={cat.id} 
               category={cat} 
               spent={expenseByCategory[cat.id] || 0} 
               limit={limit}
+              isCarryover={cat.isCarryover}
             />
           );
         })}

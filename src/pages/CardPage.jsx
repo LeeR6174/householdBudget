@@ -101,6 +101,8 @@ export default function CardPage() {
   const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
   const categories = useLiveQuery(() => db.categories.toArray()) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState('');
 
   const unconfirmedAndConfirmed = transactions.filter(t => t.cardStatus === 'unconfirmed' || t.cardStatus === 'confirmed')
     .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -110,44 +112,37 @@ export default function CardPage() {
   const handleConfirm = async (id) => { await db.transactions.update(id, { cardStatus: 'confirmed' }); };
   const handleUnconfirm = async (id) => { await db.transactions.update(id, { cardStatus: 'unconfirmed' }); };
 
-  const handlePayConfirm = async () => {
-    if (confirmedSum === 0) return alert('精算する決済（今月確定分）がありません。');
-    
-    // Select bank asset
+  const openPayModal = () => {
     const bankAssets = assets.filter(a => a.type === 'bank' || a.type === 'cash');
-    if (bankAssets.length === 0) return alert('引き落とし元の銀行口座が登録されていません。設定から追加してください。');
-    // Using first bank asset as default. In robust version we might prompt user
-    const defaultBankOptions = bankAssets.map(a => `${a.name}(${a.id})`).join('\n');
-    let bankId = bankAssets[0].id;
-    if (bankAssets.length > 1) {
-      const selected = window.prompt(`どの口座から引き落としますか？口座IDを入力してください（省略で最初の口座）\n候補:\n${defaultBankOptions}`);
-      if (selected && assets.find(a => a.id === selected)) bankId = selected;
-    }
+    if (bankAssets.length === 0) return alert('引き落とし元の銀行口座が登録されていません。');
+    setSelectedBankId(bankAssets[0].id);
+    setShowPayModal(true);
+  };
 
-    // Assuming multiple cards exist, we just find any card. To be perfect, we should group by card.
+  const handlePayExecute = async () => {
     const creditAssets = assets.filter(a => a.type === 'credit');
-    if (creditAssets.length === 0) return alert('エラー：クレジットカード資産が見つかりません');
-    const creditAssetId = creditAssets[0].id;
+    const creditAssetId = creditAssets[0]?.id;
+    if (!creditAssetId) return alert('エラー：クレジットカードが見つかりません');
 
-    if (window.confirm(`今月確定分（${formatCurrency(confirmedSum)}）を ${assets.find(a=>a.id===bankId).name} から引き落としとして精算しますか？`)) {
-      // 1. 振替記録を作成
-      await db.transactions.add({
-        id: crypto.randomUUID(),
-        type: 'transfer',
-        fromAssetId: bankId,
-        toAssetId: creditAssetId,
-        amount: confirmedSum,
-        content: 'カード引き落とし精算',
-        date: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      });
+    // 1. 振替記録を作成
+    await db.transactions.add({
+      id: crypto.randomUUID(),
+      type: 'transfer',
+      fromAssetId: selectedBankId,
+      toAssetId: creditAssetId,
+      amount: confirmedSum,
+      content: 'カード引き落とし精算',
+      date: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString()
+    });
 
-      // 2. 確定済みのカード利用を 'paid' に変更
-      const confirmedTxs = unconfirmedAndConfirmed.filter(t => t.cardStatus === 'confirmed');
-      const updatePromises = confirmedTxs.map(t => db.transactions.update(t.id, { cardStatus: 'paid' }));
-      await Promise.all(updatePromises);
-      alert('精算が完了しました！');
-    }
+    // 2. 確定済みのカード利用を 'paid' に変更
+    const confirmedTxs = unconfirmedAndConfirmed.filter(t => t.cardStatus === 'confirmed');
+    const updatePromises = confirmedTxs.map(t => db.transactions.update(t.id, { cardStatus: 'paid' }));
+    await Promise.all(updatePromises);
+    
+    setShowPayModal(false);
+    alert('精算が完了しました！');
   };
 
   return (
@@ -170,13 +165,42 @@ export default function CardPage() {
         </div>
         <button 
           className="btn w-full font-bold shadow-sm" 
-          onClick={handlePayConfirm}
+          onClick={openPayModal}
           style={{ backgroundColor: 'white', color: '#059669' }}
           disabled={confirmedSum === 0}
         >
           {confirmedSum > 0 ? '今月分を引き落とし完了にする' : '確定分がありません'}
         </button>
       </div>
+
+      {showPayModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowPayModal(false)}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '480px', margin: '0 auto', borderRadius: '24px 24px 0 0', padding: '24px', animation: 'fadeIn 0.3s' }} onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold mb-md text-lg">カード支払いの精算</h3>
+            <p className="text-sm text-secondary mb-lg">今月確定分（{formatCurrency(confirmedSum)}）をどの口座から引き落としますか？</p>
+            
+            <div className="form-group mb-xl">
+              <label className="form-label">引き落とし元口座</label>
+              {assets.filter(a => a.type === 'bank' || a.type === 'cash').map(a => (
+                <div 
+                  key={a.id} 
+                  className={`card mb-sm flex-between ${selectedBankId === a.id ? 'active' : ''}`}
+                  style={{ padding: '12px 16px', border: selectedBankId === a.id ? '2px solid var(--primary-color)' : '1px solid var(--border-color)', cursor: 'pointer' }}
+                  onClick={() => setSelectedBankId(a.id)}
+                >
+                  <span className="font-semibold">{a.name}</span>
+                  <span className="text-sm text-secondary">{formatCurrency(a.initialBalance)} 〜</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-md">
+              <button className="btn btn-outline flex-1" onClick={() => setShowPayModal(false)}>キャンセル</button>
+              <button className="btn btn-primary flex-1" onClick={handlePayExecute}>精算を実行する</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-md">
         <p className="text-sm font-bold text-secondary mb-xs">👉 スワイプ操作で振り分け</p>

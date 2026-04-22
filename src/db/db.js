@@ -17,6 +17,11 @@ db.version(4).stores({
   monthlySettings: 'month'
 });
 
+// version 5: isCarryover for categories
+db.version(5).stores({
+  categories: 'id, type, isCarryover'
+});
+
 const DEFAULT_CATEGORIES = [];
 
 const DEFAULT_ASSETS = [

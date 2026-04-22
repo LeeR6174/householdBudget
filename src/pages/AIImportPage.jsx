@@ -40,6 +40,15 @@ export default function AIImportPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setJsonText(text);
+    } catch (err) {
+      alert('クリップボードの読み取りに失敗しました。直接貼り付けてください。');
+    }
+  };
+
   const handleImport = async () => {
     if (!selectedAssetId) {
       alert('インポート先のカードを選択してください');
@@ -88,16 +97,16 @@ export default function AIImportPage() {
         <div className="page-title" style={{ marginBottom: 0 }}>AI明細インポート</div>
       </div>
 
-      <div className="card mb-lg">
-        <h3 className="font-bold mb-sm flex items-center gap-sm">
-          <Info size={18} className="text-primary" />
+      <div className="card mb-lg" style={{ backgroundColor: 'rgba(79, 70, 229, 0.05)', border: '1px solid rgba(79, 70, 229, 0.1)' }}>
+        <h3 className="font-bold mb-sm flex items-center gap-sm" style={{ color: 'var(--primary-color)' }}>
+          <Info size={18} />
           使いかた
         </h3>
-        <ol className="text-sm text-secondary" style={{ paddingLeft: '20px', lineHeight: '1.6' }}>
-          <li>下のボタンでプロンプトをコピーします。</li>
-          <li>AI（ChatGPT等）にプロンプトと<b>スクショ画像</b>を渡します。</li>
-          <li>AIが出力したJSONをコピーして、下の枠に貼り付けます。</li>
-          <li>「インポート」を押すと、未確定明細として追加されます。</li>
+        <ol className="text-sm text-secondary" style={{ paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li><b className="text-primary">プロンプトをコピー</b>ボタンを押します。</li>
+          <li>AI（ChatGPTやClaude等）に画像を送り、プロンプトを渡します。</li>
+          <li>AIが生成した<b className="text-primary">JSONコード</b>をコピーします。</li>
+          <li>下の<b className="text-primary">クリップボードから貼り付け</b>を押し、インポートを実行！</li>
         </ol>
       </div>
 
@@ -141,7 +150,16 @@ export default function AIImportPage() {
         )}
 
         <div className="form-group">
-          <label className="form-label">AIの出力(JSON)を貼り付け</label>
+          <div className="flex-between mb-sm">
+            <label className="form-label" style={{ marginBottom: 0 }}>AIの出力(JSON)を貼り付け</label>
+            <button 
+              className="text-xs font-bold text-primary" 
+              onClick={handlePaste}
+              style={{ background: 'rgba(79, 70, 229, 0.1)', border: 'none', padding: '4px 8px', borderRadius: '4px' }}
+            >
+              クリップボードから貼り付け
+            </button>
+          </div>
           <textarea 
             className="form-control" 
             rows={8} 

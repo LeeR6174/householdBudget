@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatCurrency } from '../utils/format';
 
-export default function BudgetProgressBar({ category, spent, limit: propLimit }) {
+export default function BudgetProgressBar({ category, spent, limit: propLimit, isCarryover }) {
   const limit = propLimit !== undefined ? propLimit : (category.monthlyLimit || 0);
   const isUnbudgeted = limit === 0;
   
@@ -27,6 +27,7 @@ export default function BudgetProgressBar({ category, spent, limit: propLimit })
         <div className="flex-center gap-sm font-semibold">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color || '#333' }}></div>
           <span>{category.name}</span>
+          {isCarryover && <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--primary-color)', color: 'white', padding: '1px 4px', borderRadius: '4px' }}>積立</span>}
         </div>
         <div className="text-right">
           <span className={`font-bold ${isUnbudgeted ? '' : `text-${colorClass}`}`}>{formatCurrency(spent)}</span>

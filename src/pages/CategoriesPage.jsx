@@ -19,6 +19,7 @@ export default function CategoriesPage() {
   const [color, setColor] = useState('#9ca3af');
   const [monthlyLimit, setMonthlyLimit] = useState('');
   const [thisMonthBudget, setThisMonthBudget] = useState('');
+  const [isCarryover, setIsCarryover] = useState(false);
   const currentMonthStr = getCurrentBudgetMonth();
 
   const thisMonthSettings = useLiveQuery(async () => {
@@ -45,6 +46,7 @@ export default function CategoriesPage() {
     setColor('#9ca3af');
     setMonthlyLimit('');
     setThisMonthBudget('');
+    setIsCarryover(false);
     setIsEditing(false);
   };
 
@@ -54,6 +56,7 @@ export default function CategoriesPage() {
     setType(cat.type);
     setColor(cat.color || '#9ca3af');
     setMonthlyLimit(cat.monthlyLimit?.toString() || '');
+    setIsCarryover(cat.isCarryover || false);
     setIsEditing(true);
     
     // Smooth scroll to top/form
@@ -75,7 +78,8 @@ export default function CategoriesPage() {
       name: name.trim(),
       type,
       color,
-      monthlyLimit: Number(monthlyLimit) || 0
+      monthlyLimit: Number(monthlyLimit) || 0,
+      isCarryover
     };
 
     if (editId) {
@@ -190,10 +194,30 @@ export default function CategoriesPage() {
                 <label className="form-label">基本の月額予算 (円)</label>
                 <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
               </div>
+
+              <div className="form-group flex items-center gap-sm mb-md p-sm" style={{ backgroundColor: 'rgba(79, 70, 229, 0.05)', borderRadius: '12px', cursor: 'pointer' }} onClick={() => setIsCarryover(!isCarryover)}>
+                <input 
+                  type="checkbox" 
+                  id="carryoverToggle"
+                  checked={isCarryover}
+                  onChange={(e) => setIsCarryover(e.target.checked)}
+                  style={{ width: '20px', height: '20px' }}
+                />
+                <label htmlFor="carryoverToggle" style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--primary-color)', cursor: 'pointer' }}>
+                  予算を翌月に繰り越す（積立型）
+                </label>
+              </div>
+
               <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                <label className="form-label" style={{ color: 'var(--primary-color)' }}>✨ {currentMonthStr} 限定の予算 (任意)</label>
-                <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder="今月だけ変える場合は入力" style={{ borderColor: 'var(--primary-color-light)' }} />
-                <p className="text-xs text-secondary mt-xs">※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。</p>
+                <label className="form-label" style={{ color: 'var(--primary-color)' }}>
+                  ✨ {currentMonthStr} {isCarryover ? '限定の積立額' : '限定の予算'} (任意)
+                </label>
+                <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder={isCarryover ? "今月だけ積立額を変える場合" : "今月だけ予算を変える場合"} style={{ borderColor: 'var(--primary-color-light)' }} />
+                <p className="text-xs text-secondary mt-xs">
+                  {isCarryover 
+                    ? "※未入力の場合は基本の積立額が適用されます。0を入力すると今月は積み立てません。" 
+                    : "※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。"}
+                </p>
               </div>
             </>
           )}
