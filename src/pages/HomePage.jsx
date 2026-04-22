@@ -134,6 +134,11 @@ export default function HomePage() {
     if (!cat.isCarryover) {
       totalNormalBudget += limit;
       totalNormalExpense += spent;
+    } else {
+      // 積立カテゴリの場合：当月の積立分（予算額）を「固定の支出」として計上する
+      const monthlyAddition = catBudgets.find(b => b.month === currentMonth)?.budget ?? (cat.monthlyLimit || 0);
+      totalNormalBudget += monthlyAddition;
+      totalNormalExpense += monthlyAddition;
     }
   });
 
@@ -203,8 +208,13 @@ export default function HomePage() {
 
         <div className="flex-between pt-md" style={{ position: 'relative', zIndex: 1 }}>
           <div className="text-sm font-bold opacity-90" style={{ color: 'rgba(255,255,255,0.9)' }}>💎 実質残高 (使えるお金)</div>
-          <div className="text-3xl font-black" style={{ color: netWorth < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-            {formatCurrency(netWorth)}
+          <div className="text-right">
+            <div className="text-3xl font-black" style={{ color: netWorth < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+              {formatCurrency(netWorth)}
+            </div>
+            <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              今月の総支出予定: {formatCurrency(totalNormalBudget)}
+            </div>
           </div>
         </div>
       </div>
@@ -258,13 +268,16 @@ export default function HomePage() {
         <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
         
         <div className="flex-between font-bold text-sm mb-xs" style={{ color: 'var(--primary-color)' }}>
-          <span>通常支出の合計</span>
+          <span>通常支出の合計 (積立分を含む)</span>
           <div>
             <span className="text-expense">{formatCurrency(totalNormalExpense)}</span>
             {totalNormalBudget > 0 && (
               <span className="text-secondary ml-sm" style={{ fontWeight: 'normal' }}>/ {formatCurrency(totalNormalBudget)}</span>
             )}
           </div>
+        </div>
+        <div className="text-[10px] text-secondary mb-sm opacity-70">
+          ※積立カテゴリの当月予算額を「支出」として合算しています
         </div>
         
         <div className="flex-between text-xs text-secondary mt-xs" style={{ opacity: 0.8 }}>

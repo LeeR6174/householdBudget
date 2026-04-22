@@ -319,8 +319,6 @@ export default function SettingsPage() {
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
-        <h3 className="font-bold mb-md">Excel・外部連携</h3>
-
         <h3 className="font-bold mb-md">通知設定</h3>
         <p className="text-sm text-secondary mb-md">
           リマインドや通知が届くか確認します。
