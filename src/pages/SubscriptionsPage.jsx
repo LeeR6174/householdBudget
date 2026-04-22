@@ -47,7 +47,7 @@ export default function SubscriptionsPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!categoryId || !assetId || !amount) {
+    if (!categoryId || !amount) {
       return alert('全ての必須項目を入力してください');
     }
 
@@ -101,9 +101,9 @@ export default function SubscriptionsPage() {
           </div>
 
           <div className="form-group mb-md">
-            <label className="form-label">使用カード</label>
-            <select className="form-control" value={assetId} onChange={e => setAssetId(e.target.value)} required>
-              <option value="" disabled>クレジットカードを選択</option>
+            <label className="form-label">使用カード (任意)</label>
+            <select className="form-control" value={assetId} onChange={e => setAssetId(e.target.value)}>
+              <option value="">(カード未選択)</option>
               {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
@@ -139,7 +139,7 @@ export default function SubscriptionsPage() {
             </div>
             <div style={{ flex: 1, padding: '0 12px' }}>
               <div className="font-bold">{sub.content}</div>
-              <div className="text-xs text-secondary">{getCatName(sub.categoryId)} / {getAssetName(sub.assetId)}</div>
+              <div className="text-xs text-secondary">{getCatName(sub.categoryId)} / {sub.assetId ? getAssetName(sub.assetId) : 'カード未指定'}</div>
             </div>
             <div className="text-right">
               <div className="font-bold text-expense">¥{sub.amount.toLocaleString()}</div>

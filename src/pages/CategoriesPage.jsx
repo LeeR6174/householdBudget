@@ -20,6 +20,7 @@ export default function CategoriesPage() {
   const [monthlyLimit, setMonthlyLimit] = useState('');
   const [thisMonthBudget, setThisMonthBudget] = useState('');
   const [isCarryover, setIsCarryover] = useState(false);
+  const [description, setDescription] = useState('');
   const currentMonthStr = getCurrentBudgetMonth();
 
   const thisMonthSettings = useLiveQuery(async () => {
@@ -47,6 +48,7 @@ export default function CategoriesPage() {
     setMonthlyLimit('');
     setThisMonthBudget('');
     setIsCarryover(false);
+    setDescription('');
     setIsEditing(false);
   };
 
@@ -57,6 +59,7 @@ export default function CategoriesPage() {
     setColor(cat.color || '#9ca3af');
     setMonthlyLimit(cat.monthlyLimit?.toString() || '');
     setIsCarryover(cat.isCarryover || false);
+    setDescription(cat.description || '');
     setIsEditing(true);
     
     // Smooth scroll to top/form
@@ -79,7 +82,8 @@ export default function CategoriesPage() {
       type,
       color,
       monthlyLimit: Number(monthlyLimit) || 0,
-      isCarryover
+      isCarryover,
+      description: description.trim()
     };
 
     if (editId) {
@@ -125,7 +129,10 @@ export default function CategoriesPage() {
         <div key={cat.id} className="list-item" style={{ padding: '8px 0' }}>
           <div className="flex-center gap-sm">
             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color || '#333' }}></div>
-            <span className="font-semibold">{cat.name}</span>
+            <div className="flex flex-col">
+              <span className="font-semibold">{cat.name}</span>
+              {cat.description && <span className="text-xs text-secondary">{cat.description}</span>}
+            </div>
           </div>
           <div className="flex gap-sm">
             <button onClick={() => handleEdit(cat)} className="btn btn-outline" style={{ padding: '6px', border: 'none' }}>
@@ -186,6 +193,18 @@ export default function CategoriesPage() {
               <label className="form-label">カラー</label>
               <input type="color" className="form-control" style={{ padding: '4px', height: '46px' }} value={color} onChange={e => setColor(e.target.value)} />
             </div>
+          </div>
+          
+          <div className="form-group mb-md">
+            <label className="form-label">説明 (任意)</label>
+            <textarea 
+              className="form-control" 
+              value={description} 
+              onChange={e => setDescription(e.target.value)} 
+              placeholder="カテゴリの詳細やメモを入力" 
+              rows="2"
+              style={{ resize: 'none' }}
+            />
           </div>
 
           {type === 'expense' && (

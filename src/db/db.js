@@ -27,6 +27,11 @@ db.version(6).stores({
   savingsRecords: '++id, month, type'
 });
 
+// version 7: description for categories
+db.version(7).stores({
+  categories: 'id, type, isCarryover, description'
+});
+
 const DEFAULT_CATEGORIES = [];
 
 const DEFAULT_ASSETS = [

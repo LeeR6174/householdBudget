@@ -206,13 +206,13 @@ export default function HomePage() {
           <div className="font-bold text-lg" style={{ color: '#818cf8' }}>-{formatCurrency(totalSavings)}</div>
         </div>
 
-        <div className="flex-between pt-md" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="text-sm font-bold opacity-90" style={{ color: 'rgba(255,255,255,0.9)' }}>💎 実質残高 (使えるお金)</div>
-          <div className="text-right">
-            <div className="text-3xl font-black" style={{ color: netWorth < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+        <div className="flex-between pt-md mt-sm" style={{ borderTop: '1px solid rgba(255,255,255,0.15)', position: 'relative', zIndex: 1, gap: '12px', flexWrap: 'wrap' }}>
+          <div className="text-sm font-bold opacity-90" style={{ color: 'rgba(255,255,255,0.9)', whiteSpace: 'nowrap' }}>💎 実質残高 (使えるお金)</div>
+          <div className="text-right" style={{ minWidth: '120px' }}>
+            <div className="text-3xl font-black" style={{ color: netWorth < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)', lineHeight: '1.1' }}>
               {formatCurrency(netWorth)}
             </div>
-            <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
               今月の総支出予定: {formatCurrency(totalNormalBudget)}
             </div>
           </div>
@@ -248,6 +248,7 @@ export default function HomePage() {
               spent={expenseByCategory[cat.id] || 0} 
               limit={limit}
               isCarryover={cat.isCarryover}
+              onClick={() => navigate('/settings/categories')}
             />
           );
         })}
@@ -265,20 +266,6 @@ export default function HomePage() {
           <p className="text-secondary text-sm text-center">カテゴリがありません</p>
         )}
 
-        <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
-        
-        <div className="flex-between font-bold text-sm mb-xs" style={{ color: 'var(--primary-color)' }}>
-          <span>通常支出の合計 (積立分を含む)</span>
-          <div>
-            <span className="text-expense">{formatCurrency(totalNormalExpense)}</span>
-            {totalNormalBudget > 0 && (
-              <span className="text-secondary ml-sm" style={{ fontWeight: 'normal' }}>/ {formatCurrency(totalNormalBudget)}</span>
-            )}
-          </div>
-        </div>
-        <div className="text-[10px] text-secondary mb-sm opacity-70">
-          ※積立カテゴリの当月予算額を「支出」として合算しています
-        </div>
         
         <div className="flex-between text-xs text-secondary mt-xs" style={{ opacity: 0.8 }}>
           <span>積立を含む総合計</span>

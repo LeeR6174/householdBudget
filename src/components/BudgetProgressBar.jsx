@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatCurrency } from '../utils/format';
 
-export default function BudgetProgressBar({ category, spent, limit: propLimit, isCarryover }) {
+export default function BudgetProgressBar({ category, spent, limit: propLimit, isCarryover, onClick }) {
   const limit = propLimit !== undefined ? propLimit : (category.monthlyLimit || 0);
   const isUnbudgeted = limit === 0;
   
@@ -22,7 +22,7 @@ export default function BudgetProgressBar({ category, spent, limit: propLimit, i
   if (isUnbudgeted && spent === 0) return null;
 
   return (
-    <div className="mb-md">
+    <div className="mb-md" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <div className="flex-between gap-sm text-sm mb-sm">
         <div className="flex-center gap-sm font-semibold">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color || '#333' }}></div>
