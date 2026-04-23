@@ -151,6 +151,16 @@ button, a, input, select, textarea, .list-item, .card {
   background-color: var(--surface-color);
 }
 
+/* Date Input Normalization */
+input[type="date"].form-control,
+input[type="datetime-local"].form-control {
+  min-height: 52px; /* Consistent with other inputs */
+  display: flex;
+  align-items: center;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .form-control.input-amount {
   font-size: 2rem;
   font-weight: 700;

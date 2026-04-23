@@ -166,17 +166,15 @@ export default function AddTransactionPage() {
           />
         </div>
 
-        <div className="form-group flex gap-md">
-          <div className="flex-1">
-            <label className="form-label">日付</label>
-            <input 
-              type="date" 
-              className="form-control"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
+        <div className="form-group">
+          <label className="form-label">日付</label>
+          <input 
+            type="date" 
+            className="form-control"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
         </div>
 
         {type !== 'transfer' ? (
