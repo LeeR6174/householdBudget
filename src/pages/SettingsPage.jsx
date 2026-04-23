@@ -233,16 +233,26 @@ export default function SettingsPage() {
 
   const handleTestNotification = async () => {
     if (!('Notification' in window)) {
-      alert('このブラウザはプッシュ通知をサポートしていません。');
+      alert('このブラウザはシステム通知をサポートしていません。');
       return;
     }
 
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      new Notification('格が違う家計簿', {
-        body: 'プッシュ通知のテスト成功です！✨',
-        icon: '/favicon.png'
-      });
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        registration.showNotification('格が違う家計簿', {
+          body: 'システム通知のテスト成功です！✨',
+          icon: '/favicon.png',
+          badge: '/pwa-192x192.png',
+          tag: 'test-notification'
+        });
+      } else {
+        new Notification('格が違う家計簿', {
+          body: '通知テスト成功（ブラウザ直接表示）',
+          icon: '/favicon.png'
+        });
+      }
     } else {
       alert('通知が許可されませんでした。ブラウザの設定から許可してください。');
     }

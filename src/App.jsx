@@ -79,27 +79,52 @@ function App() {
           }
         }
 
-        // --- 2. リマインダー処理 (セッション中1回のみ) ---
-        if (!sessionStorage.getItem('reminded')) {
-          sessionStorage.setItem('reminded', 'true');
+        // --- 2. 通知権限と Periodic Sync の登録 ---
+        if ('serviceWorker' in navigator && 'Notification' in window) {
+          const registration = await navigator.serviceWorker.ready;
           
-          // 15日付近: カード振り分け
-          if (currentDay >= 14 && currentDay <= 16) {
-            const unconfirmedTx = await db.transactions.toArray();
-            const hasUnconfirmed = unconfirmedTx.some(t => t.cardStatus === 'unconfirmed');
-            
-            if (hasUnconfirmed) {
-              setTimeout(() => {
-                alert('💳【お知らせ】\n\nカードの明細が届く時期です。\n未分類のカード利用を「カード」タブでスワイプして、今月の支払いに振り分けましょう！');
-              }, 1000);
+          // 通知権限の確認とリクエスト
+          if (Notification.permission === 'default') {
+            await Notification.requestPermission();
+          }
+
+          // Periodic Sync の登録 (Chrome/Edgeなどの対応ブラウザのみ)
+          if ('periodicSync' in registration) {
+            try {
+              const status = await navigator.permissions.query({
+                name: 'periodic-background-sync',
+              });
+              
+              if (status.state === 'granted') {
+                await registration.periodicSync.register('check-notifications', {
+                  minInterval: 24 * 60 * 60 * 1000, // 最小1日間隔
+                });
+              }
+            } catch (err) {
+              console.warn('Periodic Sync registration failed:', err);
             }
           }
           
-          // 25日付近: 答え合わせ
-          if (currentDay >= 24 && currentDay <= 26) {
-            setTimeout(() => {
-              alert('🏦【給料日＆照合リマインド】\n\n家計簿の締め日です！\n実際の通帳の残高と、アプリ上の「口座残高」がピタリと合っているか答え合わせをしましょう！');
-            }, 1000);
+          // アプリ起動時のシステム通知（フォールバック）
+          if (Notification.permission === 'granted' && !sessionStorage.getItem('reminded')) {
+            sessionStorage.setItem('reminded', 'true');
+            
+            if (currentDay >= 14 && currentDay <= 16) {
+              const unconfirmedTx = await db.transactions.toArray();
+              if (unconfirmedTx.some(t => t.cardStatus === 'unconfirmed')) {
+                registration.showNotification('💳 カードの振り分け時期です', {
+                  body: '未分類のカード利用を「カード」タブで振り分けましょう！',
+                  icon: '/favicon.png',
+                  badge: '/pwa-192x192.png'
+                });
+              }
+            } else if (currentDay >= 24 && currentDay <= 26) {
+              registration.showNotification('🏦 残高照合のリマインド', {
+                body: '家計簿の締め日です。口座残高の答え合わせをしましょう！',
+                icon: '/favicon.png',
+                badge: '/pwa-192x192.png'
+              });
+            }
           }
         }
       } catch (err) {
