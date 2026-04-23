@@ -134,11 +134,11 @@ export default function CategoriesPage() {
               {cat.description && <span className="text-xs text-secondary">{cat.description}</span>}
             </div>
           </div>
-          <div className="flex gap-sm">
-            <button onClick={() => handleEdit(cat)} className="btn btn-outline" style={{ padding: '6px', border: 'none' }}>
+          <div className="flex gap-sm" style={{ flexShrink: 0 }}>
+            <button onClick={() => handleEdit(cat)} className="btn-icon" title="編集">
               <Edit2 size={18} />
             </button>
-            <button onClick={() => handleDelete(cat.id)} className="btn btn-outline text-danger-color" style={{ padding: '6px', border: 'none', color: 'var(--danger-color)' }}>
+            <button onClick={() => handleDelete(cat.id)} className="btn-icon text-danger" title="削除">
               <Trash2 size={18} />
             </button>
           </div>

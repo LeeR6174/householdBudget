@@ -225,6 +225,32 @@ input[type="datetime-local"].form-control {
   color: var(--text-primary);
 }
 
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: none;
+  background-color: #f1f5f9;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-icon:active {
+  transform: scale(0.9);
+  background-color: var(--border-color);
+}
+
+.btn-icon.text-danger {
+  color: var(--danger-color);
+  background-color: #fee2e2;
+}
+
 /* Back Button (Accessibility & UX) */
 .btn-back {
   display: flex;
