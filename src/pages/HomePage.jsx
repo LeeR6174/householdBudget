@@ -216,7 +216,7 @@ export default function HomePage() {
               {formatCurrency(netWorth)}
             </div>
             <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
-              最大支出予定: {formatCurrency(totalBudget - expense)}
+              今月の残り支出: {formatCurrency(totalBudget - expense)}
             </div>
           </div>
         </div>
@@ -262,6 +262,7 @@ export default function HomePage() {
             category={{ name: '未分類・不明', color: '#9ca3af', type: 'expense' }} 
             spent={expenseByCategory['uncategorized']} 
             limit={0}
+            onClick={() => navigate('/settings/categories')}
           />
         )}
 

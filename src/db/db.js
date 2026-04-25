@@ -27,9 +27,10 @@ db.version(6).stores({
   savingsRecords: '++id, month, type'
 });
 
-// version 7: description for categories
-db.version(7).stores({
-  categories: 'id, type, isCarryover, description'
+// version 8: notifications
+db.version(8).stores({
+  categories: 'id, type, isCarryover, description',
+  notifications: '++id, day, message, lastProcessedMonth'
 });
 
 const DEFAULT_CATEGORIES = [];

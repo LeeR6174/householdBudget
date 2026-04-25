@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Trash2, Bell } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db, resetDB } from '../db/db';
 import { getCurrentBudgetMonth } from '../utils/dateUtils';
@@ -10,18 +11,33 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const backupInputRef = useRef(null);
+  const [activeTab, setActiveTab] = useState('data'); // 'data' or 'notifications'
+
+  // Notification form state
+  const [notifyDay, setNotifyDay] = useState(1);
+  const [notifyMessage, setNotifyMessage] = useState('');
 
   const settings = useLiveQuery(() => db.settings.get('master'));
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const notifications = useLiveQuery(() => db.notifications.toArray()) || [];
   const currentMonthStr = getCurrentBudgetMonth();
-  const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonthStr), [currentMonthStr]);
-  const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
-  const initialSavings = settings?.targetSavings || 0;
-
-  const handleUpdateAsset = async (id, value) => {
-    await db.assets.update(id, { initialBalance: Number(value) || 0 });
+  
+  const handleAddNotification = async (e) => {
+    e.preventDefault();
+    if (!notifyMessage.trim()) return;
+    await db.notifications.add({
+      day: Number(notifyDay),
+      message: notifyMessage.trim(),
+      lastProcessedMonth: ''
+    });
+    setNotifyMessage('');
   };
 
+  const handleDeleteNotification = async (id) => {
+    if (window.confirm('この通知を削除しますか？')) {
+      await db.notifications.delete(id);
+    }
+  };
 
   const handleReset = async () => {
     if (window.confirm('すべての記録と設定が削除されます。本当に初期化しますか？')) {
@@ -32,7 +48,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Excel インポート/エクスポート関数（前回の通り。省略せず記載）
   const parseExcelValue = (val) => val === undefined || val === null ? '' : String(val).trim();
 
   const handleFileUpload = async (e) => {
@@ -145,24 +160,26 @@ export default function SettingsPage() {
 
   const handleExportFullBackup = async () => {
     try {
-      const [transactions, categories, assets, settings, monthlySettings, monthlyBudgets] = await Promise.all([
+      const [transactions, categories, assets, settings, monthlySettings, monthlyBudgets, notifications] = await Promise.all([
         db.transactions.toArray(),
         db.categories.toArray(),
         db.assets.toArray(),
         db.settings.toArray(),
         db.monthlySettings.toArray(),
-        db.monthlyBudgets.toArray()
+        db.monthlyBudgets.toArray(),
+        db.notifications.toArray()
       ]);
 
       const backupData = {
-        version: 1,
+        version: 2,
         timestamp: new Date().toISOString(),
         transactions,
         categories,
         assets,
         settings,
         monthlySettings,
-        monthlyBudgets
+        monthlyBudgets,
+        notifications
       };
 
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -191,20 +208,17 @@ export default function SettingsPage() {
     reader.onload = async (event) => {
       try {
         const data = JSON.parse(event.target.result);
-        
-        // バリデーション（簡易）
-        if (!data.transactions || !data.categories || !data.assets) {
-          throw new Error('無効なバックアップファイルです。');
-        }
+        if (!data.transactions || !data.categories || !data.assets) throw new Error('無効な形式');
 
-        await db.transaction('rw', [db.transactions, db.categories, db.assets, db.settings, db.monthlySettings, db.monthlyBudgets], async () => {
+        await db.transaction('rw', [db.transactions, db.categories, db.assets, db.settings, db.monthlySettings, db.monthlyBudgets, db.notifications], async () => {
           await Promise.all([
             db.transactions.clear(),
             db.categories.clear(),
             db.assets.clear(),
             db.settings.clear(),
             db.monthlySettings.clear(),
-            db.monthlyBudgets.clear()
+            db.monthlyBudgets.clear(),
+            db.notifications.clear()
           ]);
 
           await Promise.all([
@@ -213,15 +227,16 @@ export default function SettingsPage() {
             db.assets.bulkAdd(data.assets),
             db.settings.bulkAdd(data.settings),
             db.monthlySettings.bulkAdd(data.monthlySettings),
-            db.monthlyBudgets.bulkAdd(data.monthlyBudgets)
+            db.monthlyBudgets.bulkAdd(data.monthlyBudgets),
+            db.notifications.bulkAdd(data.notifications || [])
           ]);
         });
 
-        alert('復元が完了しました！アプリを再起動します。');
+        alert('復元完了！');
         window.location.reload();
       } catch (err) {
         console.error(err);
-        alert('復元に失敗しました。ファイルが壊れているか、形式が正しくありません。');
+        alert('復元失敗');
       } finally {
         backupInputRef.current.value = null;
       }
@@ -229,32 +244,17 @@ export default function SettingsPage() {
     reader.readAsText(file);
   };
 
-  const handleExportXlsx = async () => { /* 前回同様のため割愛しますが、必要なら後で追加します。いったんは表示だけ */ };
-
   const handleTestNotification = async () => {
-    if (!('Notification' in window)) {
-      alert('このブラウザはシステム通知をサポートしていません。');
-      return;
-    }
-
+    if (!('Notification' in window)) return alert('未対応ブラウザ');
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.ready;
-        registration.showNotification('格が違う家計簿', {
-          body: 'システム通知のテスト成功です！✨',
-          icon: '/favicon.png',
-          badge: '/pwa-192x192.png',
-          tag: 'test-notification'
-        });
-      } else {
-        new Notification('格が違う家計簿', {
-          body: '通知テスト成功（ブラウザ直接表示）',
-          icon: '/favicon.png'
-        });
-      }
-    } else {
-      alert('通知が許可されませんでした。ブラウザの設定から許可してください。');
+      const registration = await navigator.serviceWorker.ready;
+      registration.showNotification('格が違う家計簿', {
+        body: 'テスト通知成功！✨',
+        icon: '/favicon.png',
+        badge: '/pwa-192x192.png',
+        silent: true
+      });
     }
   };
 
@@ -262,121 +262,126 @@ export default function SettingsPage() {
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="page-title">設定</div>
 
-
-      <div className="card mb-lg">
-        <h3 className="font-bold mb-md">マスターデータ管理</h3>
-        
-        <div className="form-group mb-lg">
-          <p className="text-sm text-secondary mb-sm">家計簿のカテゴリ（分類）を追加・編集・削除します。</p>
-          <button className="btn btn-primary w-full" onClick={() => navigate('/settings/categories')}>
-            カテゴリ管理
-          </button>
-        </div>
-
-        <div className="form-group mb-lg">
-          <p className="text-sm text-secondary mb-sm">貯金の積立や、大きな買い物のための「切り崩し」を記録します。</p>
-          <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/savings')} style={{ borderColor: 'var(--primary-color)' }}>
-            💰 貯金・切り崩し管理
-          </button>
-        </div>
-
-        <div className="form-group mb-lg">
-          <p className="text-sm text-secondary mb-sm">毎月自動でカード支払いに計上される固定費を設定します。</p>
-          <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/subscriptions')} style={{ borderColor: 'var(--primary-color)' }}>
-            サブスク・固定費の自動入力設定
-          </button>
-        </div>
-
-        <div className="form-group">
-          <p className="text-sm text-secondary mb-sm">口座の初期残高や、家用の貯金の設定を行います。</p>
-          <button className="btn btn-outline w-full font-bold" onClick={() => navigate('/settings/initial-balance')}>
-            初期残高・貯金設定
-          </button>
-        </div>
-      </div>
-
-      <div className="card">
-        <h3 className="font-bold mb-md">データのインポート</h3>
-        
-        <div className="form-group mb-lg">
-          <p className="text-sm text-secondary mb-sm">AI（ChatGPT等）を使って、クレカのスクショから明細を一括登録します。</p>
-          <button className="btn btn-primary w-full" onClick={() => navigate('/settings/ai-import')} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}>
-            ✨ AI明細インポート
-          </button>
-        </div>
-
-        <button className="btn btn-outline mb-lg w-full" onClick={() => fileInputRef.current?.click()}>
-          Excelを取り込む (.xlsx)
+      {/* Tabs */}
+      <div className="toggle-group mb-lg">
+        <button 
+          className={`toggle-btn ${activeTab === 'data' ? 'active expense' : ''}`}
+          onClick={() => setActiveTab('data')}
+        >
+          データ管理
         </button>
-        <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
-
-        <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
-
-        <h3 className="font-bold mb-md">データのバックアップと復元</h3>
-        <p className="text-sm text-secondary mb-md">
-          アプリの全てのデータを1つのファイルとして保存・復元します。<br/>
-          機種変更や、ホーム画面アイコンの追加時などの引き継ぎに使います。
-        </p>
-        <div className="flex gap-md mb-lg">
-          <button className="btn btn-primary w-full" onClick={handleExportFullBackup}>
-            全データをバックアップ
-          </button>
-          <button className="btn btn-outline w-full font-bold" onClick={() => backupInputRef.current?.click()}>
-            バックアップから復元
-          </button>
-          <input type="file" accept=".json" ref={backupInputRef} onChange={handleImportFullBackup} style={{ display: 'none' }} />
-        </div>
-
-        <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
-
-        <h3 className="font-bold mb-md">通知設定</h3>
-        <p className="text-sm text-secondary mb-md">
-          リマインドや通知が届くか確認します。
-        </p>
-        <button className="btn btn-outline w-full mb-lg font-bold" onClick={handleTestNotification}>
-          🔔 プッシュ通知のテストを行う
-        </button>
-
-        <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
-
-        <h3 className="font-bold mb-md text-danger-color">危険な操作</h3>
-        <button className="btn btn-danger w-full" onClick={handleReset}>
-          データを初期化する
+        <button 
+          className={`toggle-btn ${activeTab === 'notifications' ? 'active expense' : ''}`}
+          onClick={() => setActiveTab('notifications')}
+        >
+          通知設定
         </button>
       </div>
+
+      {activeTab === 'data' ? (
+        <>
+          <div className="card mb-lg">
+            <h3 className="font-bold mb-md">マスターデータ管理</h3>
+            <div className="form-group mb-lg">
+              <button className="btn btn-primary w-full" onClick={() => navigate('/settings/categories')}>カテゴリ管理</button>
+            </div>
+            <div className="form-group mb-lg">
+              <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/savings')}>💰 貯金・切り崩し管理</button>
+            </div>
+            <div className="form-group mb-lg">
+              <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/subscriptions')}>サブスク・固定費の自動入力</button>
+            </div>
+            <div className="form-group">
+              <button className="btn btn-outline w-full font-bold" onClick={() => navigate('/settings/initial-balance')}>初期残高・貯金設定</button>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="font-bold mb-md">インポート / エクスポート</h3>
+            <button className="btn btn-primary w-full mb-lg" onClick={() => navigate('/settings/ai-import')} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}>✨ AI明細インポート</button>
+            <button className="btn btn-outline mb-lg w-full" onClick={() => fileInputRef.current?.click()}>Excelを取り込む (.xlsx)</button>
+            <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
+            <div className="flex gap-md mb-lg">
+              <button className="btn btn-primary w-full" onClick={handleExportFullBackup}>バックアップ</button>
+              <button className="btn btn-outline w-full font-bold" onClick={() => backupInputRef.current?.click()}>復元</button>
+              <input type="file" accept=".json" ref={backupInputRef} onChange={handleImportFullBackup} style={{ display: 'none' }} />
+            </div>
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
+            <h3 className="font-bold mb-md text-danger-color">危険な操作</h3>
+            <button className="btn btn-danger w-full" onClick={handleReset}>データを初期化する</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="card mb-lg">
+            <h3 className="font-bold mb-md">毎月のリマインド設定</h3>
+            <p className="text-sm text-secondary mb-md">指定した日にちに、アプリからリマインド通知を送ります。</p>
+            
+            <form onSubmit={handleAddNotification} className="mb-lg p-md" style={{ backgroundColor: 'var(--bg-color)', borderRadius: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">通知する日 (毎月)</label>
+                <div className="flex items-center gap-sm">
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="31" 
+                    className="form-control" 
+                    style={{ width: '80px' }} 
+                    value={notifyDay} 
+                    onChange={e => setNotifyDay(e.target.value)} 
+                  />
+                  <span>日</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">通知メッセージ</label>
+                <textarea 
+                  className="form-control" 
+                  rows="2" 
+                  value={notifyMessage} 
+                  onChange={e => setNotifyMessage(e.target.value)} 
+                  placeholder="例: クレジットカードの明細を確認しましょう！"
+                />
+              </div>
+              <button type="submit" className="btn btn-primary w-full">通知を追加</button>
+            </form>
+
+            <div className="mt-md">
+              <h4 className="font-bold text-sm text-secondary mb-sm">設定済みの通知</h4>
+              {notifications.map(n => (
+                <div key={n.id} className="list-item">
+                  <div className="flex-1">
+                    <div className="font-bold text-primary">毎月 {n.day} 日</div>
+                    <div className="text-sm">{n.message}</div>
+                  </div>
+                  <button className="btn-icon text-danger" onClick={() => handleDeleteNotification(n.id)}>
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+              {notifications.length === 0 && <p className="text-sm text-secondary text-center py-lg">通知設定はありません</p>}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="font-bold mb-md">動作確認</h3>
+            <button className="btn btn-outline w-full mb-lg font-bold" onClick={handleTestNotification}>
+              🔔 今すぐ通知テストを実行
+            </button>
+            <p className="text-xs text-secondary text-center">※通知が届かない場合は、端末の設定で通知が許可されているか確認してください。</p>
+          </div>
+        </>
+      )}
 
       <div className="card mt-lg">
         <h3 className="font-bold mb-md">お問い合わせ・フィードバック</h3>
-        <p className="text-sm text-secondary mb-md">
-          アプリへのご意見・ご要望はこちらからお送りください。
-        </p>
-        <a 
-          href="https://docs.google.com/forms/d/e/1FAIpQLSdeaUhqb6sWCcu6YEv3L7G3X4Ut2DOR0EHLglBbP1oQjXtyxQ/viewform?usp=publish-editor" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="btn btn-outline w-full font-bold flex-center gap-sm"
-          style={{ textDecoration: 'none', color: 'var(--text-primary)' }}
-        >
-          📩 意見フォームはこちら
-        </a>
-      </div>
-
-      <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-        <h3 className="font-bold mb-md">アップデート内容 (V1.1.1.1)</h3>
-        <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
-          <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            <li>履歴の並び順を「日付（新しい順）＋入力（古い順）」に改善</li>
-            <li>ホーム画面の「最大支出予定」の計算ロジックを修正</li>
-            <li>ホームのカテゴリをタップして直接編集できる機能を追加</li>
-            <li>アプリ起動時の通知を抑制し、バックグラウンド通知のみに修正</li>
-            <li>意見提出用フォームへのリンクを設置</li>
-          </ul>
-        </div>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSdeaUhqb6sWCcu6YEv3L7G3X4Ut2DOR0EHLglBbP1oQjXtyxQ/viewform?usp=publish-editor" target="_blank" rel="noopener noreferrer" className="btn btn-outline w-full font-bold">📩 意見フォームはこちら</a>
       </div>
 
       <div className="text-center mt-xl mb-lg opacity-50">
         <div className="text-xs font-bold">格が違う家計簿</div>
-        <div className="text-[10px]">Version 1.1.1.1</div>
+        <div className="text-[10px]">Version 1.1.1.2</div>
       </div>
     </div>
   );

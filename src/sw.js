@@ -27,25 +27,41 @@ const showNotification = (title, options) => {
 const checkAndShowReminders = async () => {
   const now = new Date();
   const day = now.getDate();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  // 本来はIndexedDBを読み取って詳細な条件をチェックできますが、
-  // ここでは日付ベースのシンプルなリマインドを実装します。
+  // IndexedDBから通知設定を読み取る
+  return new Promise((resolve) => {
+    const request = indexedDB.open('kakeiboDB');
+    request.onsuccess = async (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('notifications')) {
+        resolve();
+        return;
+      }
 
-  // 15日前後のカードリマインド
-  if (day >= 14 && day <= 16) {
-    await showNotification('💳 カードの振り分け時期です', {
-      body: '未分類のカード利用を「カード」タブで今月の支払いに振り分けましょう！',
-      tag: 'card-reminder'
-    });
-  }
+      const tx = db.transaction('notifications', 'readwrite');
+      const store = tx.objectStore('notifications');
+      const getAllRequest = store.getAll();
 
-  // 25日前後の残高照合リマインド
-  if (day >= 24 && day <= 26) {
-    await showNotification('🏦 残高照合のリマインド', {
-      body: '家計簿の締め日です。実際の通帳残高とアプリの数字を合わせましょう！',
-      tag: 'balance-reminder'
-    });
-  }
+      getAllRequest.onsuccess = async () => {
+        const notifications = getAllRequest.result;
+        for (const n of notifications) {
+          if (day >= n.day && n.lastProcessedMonth !== month) {
+            await showNotification('格が違う家計簿', {
+              body: n.message,
+              tag: `reminder-${n.id}`,
+              silent: true
+            });
+            n.lastProcessedMonth = month;
+            store.put(n);
+          }
+        }
+        resolve();
+      };
+      getAllRequest.onerror = () => resolve();
+    };
+    request.onerror = () => resolve();
+  });
 };
 
 // Periodic Sync イベントのリスナー

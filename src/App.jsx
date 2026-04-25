@@ -109,6 +109,21 @@ function App() {
           // 通知が煩わしいとの意見があったため、現在は Service Worker (sw.js) の
           // Periodic Background Sync での通知のみに制限しています。
         }
+        // --- 4. 通知リマインドの処理 ---
+        const notifications = await db.notifications.toArray();
+        for (const n of notifications) {
+          if (currentDay >= n.day && n.lastProcessedMonth !== currentBudgetMonth) {
+            const registration = await navigator.serviceWorker.ready;
+            registration.showNotification('格が違う家計簿', {
+              body: n.message,
+              icon: '/favicon.png',
+              badge: '/pwa-192x192.png',
+              tag: `reminder-${n.id}`,
+              silent: true
+            });
+            await db.notifications.update(n.id, { lastProcessedMonth: currentBudgetMonth });
+          }
+        }
       } catch (err) {
         console.error('Initial DB Process error:', err);
       }
