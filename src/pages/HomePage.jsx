@@ -216,7 +216,7 @@ export default function HomePage() {
               {formatCurrency(netWorth)}
             </div>
             <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
-              最大支出予定: {formatCurrency(totalBudget)}
+              最大支出予定: {formatCurrency(totalBudget - expense)}
             </div>
           </div>
         </div>
