@@ -64,6 +64,9 @@ export default function TransactionItem({ transaction, categories, assets, onCli
             <span className="text-xs text-secondary truncate" style={{ opacity: 0.7 }}>
               {asset?.name || '不明'}
             </span>
+            <span className="text-xs text-secondary ml-auto" style={{ opacity: 0.6 }}>
+              {formatDate(transaction.date)}
+            </span>
           </div>
           <div className="font-bold text-base truncate leading-tight">
             {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '未設定'}

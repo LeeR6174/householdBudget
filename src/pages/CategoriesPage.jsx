@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Trash2, Edit2, Plus } from 'lucide-react';
 import { db } from '../db/db';
@@ -10,6 +10,7 @@ export default function CategoriesPage() {
   const formRef = useRef(null);
   const categories = useLiveQuery(() => db.categories.toArray()) || [];
   
+  const [searchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   
@@ -31,6 +32,17 @@ export default function CategoriesPage() {
       .first();
   }, [editId, currentMonthStr]);
 
+  // Handle edit param from URL
+  React.useEffect(() => {
+    const editParamId = searchParams.get('edit');
+    if (editParamId && categories.length > 0) {
+      const catToEdit = categories.find(c => c.id === editParamId);
+      if (catToEdit) {
+        handleEdit(catToEdit);
+      }
+    }
+  }, [searchParams, categories]);
+
   // Update thisMonthBudget when thisMonthSettings changes
   React.useEffect(() => {
     if (thisMonthSettings) {
@@ -50,6 +62,7 @@ export default function CategoriesPage() {
     setIsCarryover(false);
     setDescription('');
     setIsEditing(false);
+    setSearchParams({}, { replace: true });
   };
 
   const handleEdit = (cat) => {

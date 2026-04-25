@@ -15,8 +15,15 @@ export default function HistoryPage() {
   const transactions = useLiveQuery(() => {
     return db.transactions
       .filter(tx => tx.date >= startDate && tx.date <= endDate)
-      .reverse()
-      .toArray();
+      .toArray()
+      .then(items => items.sort((a, b) => {
+        // 日付の降順（新しい日が上）
+        if (a.date !== b.date) {
+          return b.date.localeCompare(a.date);
+        }
+        // 同じ日付なら作成日時の昇順（入力された順）
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      }));
   }, [startDate, endDate]) || [];
 
   const categories = useLiveQuery(() => db.categories.toArray()) || [];

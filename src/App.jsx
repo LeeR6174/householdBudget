@@ -105,27 +105,9 @@ function App() {
             }
           }
           
-          // アプリ起動時のシステム通知（フォールバック）
-          if (Notification.permission === 'granted' && !sessionStorage.getItem('reminded')) {
-            sessionStorage.setItem('reminded', 'true');
-            
-            if (currentDay >= 14 && currentDay <= 16) {
-              const unconfirmedTx = await db.transactions.toArray();
-              if (unconfirmedTx.some(t => t.cardStatus === 'unconfirmed')) {
-                registration.showNotification('💳 カードの振り分け時期です', {
-                  body: '未分類のカード利用を「カード」タブで振り分けましょう！',
-                  icon: '/favicon.png',
-                  badge: '/pwa-192x192.png'
-                });
-              }
-            } else if (currentDay >= 24 && currentDay <= 26) {
-              registration.showNotification('🏦 残高照合のリマインド', {
-                body: '家計簿の締め日です。口座残高の答え合わせをしましょう！',
-                icon: '/favicon.png',
-                badge: '/pwa-192x192.png'
-              });
-            }
-          }
+          // --- 3. アプリ起動時のシステム通知（フォールバック） ---
+          // 通知が煩わしいとの意見があったため、現在は Service Worker (sw.js) の
+          // Periodic Background Sync での通知のみに制限しています。
         }
       } catch (err) {
         console.error('Initial DB Process error:', err);

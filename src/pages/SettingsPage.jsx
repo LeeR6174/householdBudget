@@ -344,6 +344,40 @@ export default function SettingsPage() {
           データを初期化する
         </button>
       </div>
+
+      <div className="card mt-lg">
+        <h3 className="font-bold mb-md">お問い合わせ・フィードバック</h3>
+        <p className="text-sm text-secondary mb-md">
+          アプリへのご意見・ご要望はこちらからお送りください。
+        </p>
+        <a 
+          href="https://docs.google.com/forms/d/e/1FAIpQLSdeaUhqb6sWCcu6YEv3L7G3X4Ut2DOR0EHLglBbP1oQjXtyxQ/viewform?usp=publish-editor" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="btn btn-outline w-full font-bold flex-center gap-sm"
+          style={{ textDecoration: 'none', color: 'var(--text-primary)' }}
+        >
+          📩 意見フォームはこちら
+        </a>
+      </div>
+
+      <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
+        <h3 className="font-bold mb-md">アップデート内容 (V1.1.1.1)</h3>
+        <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
+          <ul style={{ paddingLeft: '20px', margin: 0 }}>
+            <li>履歴の並び順を「日付（新しい順）＋入力（古い順）」に改善</li>
+            <li>ホーム画面の「最大支出予定」の計算ロジックを修正</li>
+            <li>ホームのカテゴリをタップして直接編集できる機能を追加</li>
+            <li>アプリ起動時の通知を抑制し、バックグラウンド通知のみに修正</li>
+            <li>意見提出用フォームへのリンクを設置</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="text-center mt-xl mb-lg opacity-50">
+        <div className="text-xs font-bold">格が違う家計簿</div>
+        <div className="text-[10px]">Version 1.1.1.1</div>
+      </div>
     </div>
   );
 }

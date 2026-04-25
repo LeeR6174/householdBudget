@@ -28,8 +28,11 @@ export default function HomePage() {
   const currentMonthTx = useLiveQuery(() => {
     return db.transactions
       .filter(tx => tx.date >= startDate && tx.date <= endDate)
-      .reverse()
-      .toArray();
+      .toArray()
+      .then(items => items.sort((a, b) => {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      }));
   }, [startDate, endDate]) || [];
 
   const allTx = useLiveQuery(() => db.transactions.toArray()) || [];
@@ -213,7 +216,7 @@ export default function HomePage() {
               {formatCurrency(netWorth)}
             </div>
             <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
-              今月の総支出予定: {formatCurrency(totalNormalBudget)}
+              最大支出予定: {formatCurrency(totalBudget)}
             </div>
           </div>
         </div>
@@ -248,7 +251,7 @@ export default function HomePage() {
               spent={expenseByCategory[cat.id] || 0} 
               limit={limit}
               isCarryover={cat.isCarryover}
-              onClick={() => navigate('/settings/categories')}
+              onClick={() => navigate(`/settings/categories?edit=${cat.id}`)}
             />
           );
         })}
