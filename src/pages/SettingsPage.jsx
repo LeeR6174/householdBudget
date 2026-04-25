@@ -379,9 +379,22 @@ export default function SettingsPage() {
         <a href="https://docs.google.com/forms/d/e/1FAIpQLSdeaUhqb6sWCcu6YEv3L7G3X4Ut2DOR0EHLglBbP1oQjXtyxQ/viewform?usp=publish-editor" target="_blank" rel="noopener noreferrer" className="btn btn-outline w-full font-bold">📩 意見フォームはこちら</a>
       </div>
 
+      <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
+        <h3 className="font-bold mb-md">アップデート内容 (V1.1.1.3)</h3>
+        <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
+          <ul style={{ paddingLeft: '20px', margin: 0 }}>
+            <li>履歴の並び順を完全に降順（日付・入力順ともに新しい順）に統一</li>
+            <li>設定画面に「通知設定」タブを追加、毎月のリマインドを自由に追加可能に</li>
+            <li>ホーム画面の予算表示を「今月の残り支出」に変更</li>
+            <li>ホームの各カテゴリをタップして直接予算や設定を編集できる機能を追加</li>
+            <li>通知音をオフにし、より静かにリマインドを受け取れるように改善</li>
+          </ul>
+        </div>
+      </div>
+
       <div className="text-center mt-xl mb-lg opacity-50">
         <div className="text-xs font-bold">格が違う家計簿</div>
-        <div className="text-[10px]">Version 1.1.1.2</div>
+        <div className="text-[10px]">Version 1.1.1.3</div>
       </div>
     </div>
   );

@@ -21,8 +21,8 @@ export default function HistoryPage() {
         if (a.date !== b.date) {
           return b.date.localeCompare(a.date);
         }
-        // 同じ日付なら作成日時の昇順（入力された順）
-        return (a.createdAt || '').localeCompare(b.createdAt || '');
+        // 同じ日付なら作成日時の降順（新しい入力が上）
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
       }));
   }, [startDate, endDate]) || [];
 

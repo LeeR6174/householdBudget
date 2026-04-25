@@ -31,7 +31,7 @@ export default function HomePage() {
       .toArray()
       .then(items => items.sort((a, b) => {
         if (a.date !== b.date) return b.date.localeCompare(a.date);
-        return (a.createdAt || '').localeCompare(b.createdAt || '');
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
       }));
   }, [startDate, endDate]) || [];
 
