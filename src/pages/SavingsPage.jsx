@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Plus, Minus, History } from 'lucide-react';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getNextMonth } from '../utils/dateUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
@@ -12,6 +12,8 @@ export default function SavingsPage() {
   
   const settings = useLiveQuery(() => db.settings.get('master'));
   const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonthStr), [currentMonthStr]);
+  const nextMonthStr = getNextMonth(currentMonthStr);
+  const nextMonthlySettings = useLiveQuery(() => db.monthlySettings.get(nextMonthStr), [nextMonthStr]);
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
   const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
   
@@ -33,6 +35,17 @@ export default function SavingsPage() {
   const handleUpdateMonthlySavings = async (value) => {
     const amount = Number(value) || 0;
     await db.monthlySettings.put({ month: currentMonthStr, targetSavings: amount });
+    
+    // 来月の設定がまだない場合、当月の設定を反映する
+    const nextSettings = await db.monthlySettings.get(nextMonthStr);
+    if (!nextSettings) {
+      await db.monthlySettings.put({ month: nextMonthStr, targetSavings: amount });
+    }
+  };
+
+  const handleUpdateNextMonthlySavings = async (value) => {
+    const amount = Number(value) || 0;
+    await db.monthlySettings.put({ month: nextMonthStr, targetSavings: amount });
   };
 
   const handleAddRecord = async (e) => {
@@ -98,6 +111,25 @@ export default function SavingsPage() {
             style={{ fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'right' }}
           />
           <span className="font-bold text-sm">円</span>
+        </div>
+      </div>
+
+      <div className="card mb-lg" style={{ border: '1px dashed var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.01)' }}>
+        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)', opacity: 0.8 }}>📅 {nextMonthStr} の積立額 (予定)</h3>
+        <p className="text-xs text-secondary mb-md">
+          来月の積立予定額を設定します。
+        </p>
+        <div className="flex-center gap-md">
+          <input 
+            type="number" 
+            inputMode="numeric" 
+            className="form-control" 
+            value={nextMonthlySettings?.targetSavings ?? ''} 
+            onChange={(e) => handleUpdateNextMonthlySavings(e.target.value)}
+            placeholder="0"
+            style={{ fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'right', opacity: 0.8 }}
+          />
+          <span className="font-bold text-sm" style={{ opacity: 0.8 }}>円</span>
         </div>
       </div>
 
