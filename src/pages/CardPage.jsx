@@ -104,6 +104,7 @@ export default function CardPage() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState('');
 
+  const bankAssets = assets.filter(a => a.type === 'bank');
   const unconfirmedAndConfirmed = transactions.filter(t => t.cardStatus === 'unconfirmed' || t.cardStatus === 'confirmed')
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -113,7 +114,7 @@ export default function CardPage() {
   const handleUnconfirm = async (id) => { await db.transactions.update(id, { cardStatus: 'unconfirmed' }); };
 
   const openPayModal = () => {
-    const bankAssets = assets.filter(a => a.type === 'bank' || a.type === 'cash');
+    const bankAssets = assets.filter(a => a.type === 'bank');
     if (bankAssets.length === 0) return alert('引き落とし元の銀行口座が登録されていません。');
     setSelectedBankId(bankAssets[0].id);
     setShowPayModal(true);
@@ -181,17 +182,27 @@ export default function CardPage() {
             
             <div className="form-group mb-xl">
               <label className="form-label">引き落とし元口座</label>
-              {assets.filter(a => a.type === 'bank' || a.type === 'cash').map(a => (
+              {bankAssets.length > 1 ? (
+                bankAssets.map(a => (
+                  <div 
+                    key={a.id} 
+                    className={`card mb-sm flex-between ${selectedBankId === a.id ? 'active' : ''}`}
+                    style={{ padding: '12px 16px', border: selectedBankId === a.id ? '2px solid var(--primary-color)' : '1px solid var(--border-color)', cursor: 'pointer' }}
+                    onClick={() => setSelectedBankId(a.id)}
+                  >
+                    <span className="font-semibold">{a.name}</span>
+                    <span className="text-sm text-secondary">{formatCurrency(a.initialBalance)} 〜</span>
+                  </div>
+                ))
+              ) : (
                 <div 
-                  key={a.id} 
-                  className={`card mb-sm flex-between ${selectedBankId === a.id ? 'active' : ''}`}
-                  style={{ padding: '12px 16px', border: selectedBankId === a.id ? '2px solid var(--primary-color)' : '1px solid var(--border-color)', cursor: 'pointer' }}
-                  onClick={() => setSelectedBankId(a.id)}
+                  className="card active flex-between"
+                  style={{ padding: '12px 16px', border: '2px solid var(--primary-color)', backgroundColor: 'rgba(79, 70, 229, 0.05)' }}
                 >
-                  <span className="font-semibold">{a.name}</span>
-                  <span className="text-sm text-secondary">{formatCurrency(a.initialBalance)} 〜</span>
+                  <span className="font-semibold">{bankAssets[0]?.name}</span>
+                  <span className="text-xs text-primary font-bold">🏦 銀行振替</span>
                 </div>
-              ))}
+              )}
             </div>
 
             <div className="flex gap-md">

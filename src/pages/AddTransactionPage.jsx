@@ -183,7 +183,7 @@ export default function AddTransactionPage() {
               <label className="form-label">使用資産</label>
               <select className="form-control" value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
                 <option value="" disabled>口座・カードを選択</option>
-                {assets.map(a => <option key={a.id} value={a.id}>{a.type === 'credit' ? '💳 ' : '🏦 '}{a.name}</option>)}
+                {assets.map(a => <option key={a.id} value={a.id}>{a.type === 'credit' ? '💳 ' : a.type === 'cash' ? '💵 ' : '🏦 '}{a.name}</option>)}
               </select>
             </div>
             
@@ -201,7 +201,7 @@ export default function AddTransactionPage() {
               <label className="form-label">出金元</label>
               <select className="form-control" value={fromAssetId} onChange={(e) => setFromAssetId(e.target.value)} required>
                 <option value="" disabled>選択</option>
-                {assets.map(a => <option key={a.id} value={a.id}>{a.type === 'credit' ? '💳 ' : '🏦 '}{a.name}</option>)}
+                {assets.map(a => <option key={a.id} value={a.id}>{a.type === 'credit' ? '💳 ' : a.type === 'cash' ? '💵 ' : '🏦 '}{a.name}</option>)}
               </select>
             </div>
             <div className="flex-center mt-lg text-secondary">→</div>
@@ -209,7 +209,7 @@ export default function AddTransactionPage() {
               <label className="form-label">入金先</label>
               <select className="form-control" value={toAssetId} onChange={(e) => setToAssetId(e.target.value)} required>
                 <option value="" disabled>選択</option>
-                {assets.map(a => <option key={a.id} value={a.id}>{a.type === 'credit' ? '💳 ' : '🏦 '}{a.name}</option>)}
+                {assets.map(a => <option key={a.id} value={a.id}>{a.type === 'credit' ? '💳 ' : a.type === 'cash' ? '💵 ' : '🏦 '}{a.name}</option>)}
               </select>
             </div>
           </div>
