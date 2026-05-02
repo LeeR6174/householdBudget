@@ -24,10 +24,6 @@ export default function AddTransactionPage() {
 
   const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
-  
-  const allTx = useLiveQuery(() => db.transactions.toArray()) || [];
-  const contentSuggestions = Array.from(new Set(allTx.filter(t => t.content).map(t => t.content)));
-
   // Fetch existing transaction if editing
   const existingTx = useLiveQuery(async () => {
     if (!id) return null;
@@ -219,17 +215,11 @@ export default function AddTransactionPage() {
           <label className="form-label">内容</label>
           <input 
             type="text" 
-            list="contentSuggestions"
             className="form-control"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="店名や目的など"
           />
-          <datalist id="contentSuggestions">
-            {contentSuggestions.map((s, i) => (
-              <option key={i} value={s} />
-            ))}
-          </datalist>
         </div>
 
         <div className="form-group mb-lg">

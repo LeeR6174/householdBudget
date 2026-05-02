@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
@@ -12,11 +12,13 @@ export default function AnalysisPage() {
 
   const categories = useLiveQuery(() => db.categories.where('type').equals('expense').toArray()) || [];
   
-  // 期間内の支出トランザクションを取得
-  const txFilter = (tx) => {
-    return tx.type === 'expense' && tx.date >= startDate && tx.date <= endDate;
-  };
-  const transactions = useLiveQuery(() => db.transactions.filter(txFilter).toArray(), [startDate, endDate]) || [];
+  // 期間内の支出トランザクションを取得 (Indexed Query)
+  const transactions = useLiveQuery(() => 
+    db.transactions
+      .where('date').between(startDate, endDate, true, true)
+      .filter(tx => tx.type === 'expense')
+      .toArray()
+  , [startDate, endDate]) || [];
 
   // カテゴリ別集計
   const expensesByCategory = {};
@@ -78,7 +80,7 @@ export default function AnalysisPage() {
       <div className="card">
         <h3 className="font-bold mb-lg">カテゴリ別支出</h3>
         
-        {chartData.length > 0 ? (
+        {sortedChartData.length > 0 ? (
           <>
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer>
@@ -105,14 +107,16 @@ export default function AnalysisPage() {
             <div className="mt-xl">
               <h4 className="text-sm font-bold text-secondary mb-md">支出内訳</h4>
               {sortedChartData.map((item, idx) => (
-                <div key={idx} className="list-item">
-                  <div className="flex-center gap-sm">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>
-                    <span className="font-semibold">{item.name}</span>
+                <div key={idx} className="list-item" style={{ padding: '12px 0' }}>
+                  <div className="flex items-center gap-md flex-1 min-w-0">
+                    <div className="category-block" style={{ backgroundColor: item.color, color: '#fff' }}>
+                      {item.name.slice(0, 4)}
+                    </div>
+                    <span className="font-semibold text-base truncate">{item.name}</span>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold">{formatCurrency(item.amount)}</div>
-                    <div className="text-xs text-secondary">
+                  <div className="text-right ml-md flex-shrink-0">
+                    <div className="font-bold text-base">{formatCurrency(item.amount)}</div>
+                    <div className="text-[10px] text-secondary font-bold">
                       {((item.amount / totalExpense) * 100).toFixed(1)}%
                     </div>
                   </div>

@@ -14,7 +14,7 @@ export default function HistoryPage() {
 
   const transactions = useLiveQuery(() => {
     return db.transactions
-      .filter(tx => tx.date >= startDate && tx.date <= endDate)
+      .where('date').between(startDate, endDate, true, true)
       .toArray()
       .then(items => items.sort((a, b) => {
         // 日付の降順（新しい日が上）

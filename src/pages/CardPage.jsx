@@ -5,7 +5,7 @@ import { db } from '../db/db';
 import { formatCurrency, formatDate } from '../utils/format';
 import { Check, Clock } from 'lucide-react';
 
-const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) => {
+const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, category }) => {
   const [tx, setTx] = useState(0);
   const startX = useRef(null);
   const startY = useRef(null);
@@ -25,7 +25,6 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) =>
     const diffX = e.touches[0].clientX - startX.current;
     const diffY = e.touches[0].clientY - startY.current;
     
-    // 最初にどちらの動きが強いかでスクロールかスワイプかを決定
     if (!isSwiping.current && !isScrolling.current) {
       if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 5) {
         isScrolling.current = true;
@@ -38,7 +37,7 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) =>
 
     if (isScrolling.current) return;
     
-    e.preventDefault(); // スワイプ中はスクロールを止める
+    e.preventDefault();
     if (diffX > 120) setTx(120);
     else if (diffX < -120) setTx(-120);
     else setTx(diffX);
@@ -78,17 +77,24 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) =>
           border: '1px solid rgba(0,0,0,0.02)'
         }}
       >
-        <div className="flex-between" style={{ alignItems: 'center' }}>
+        <div className="flex items-center gap-md">
+          <div 
+            className="category-block"
+            style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff' }}
+          >
+            {category?.name?.slice(0, 4) || '?'}
+          </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xs text-secondary mb-xs">{formatDate(transaction.date)}</div>
-            <div className="font-bold truncate" style={{ fontSize: '1.1rem', lineHeight: '1.2' }}>{transaction.content || '名称未設定'}</div>
-            <div className="text-xs text-secondary mt-xs">{categoryName}</div>
+            <div className="flex-between mb-xs">
+              <span className="text-[10px] text-secondary font-bold uppercase tracking-wider">{formatDate(transaction.date)}</span>
+              <span className="text-[10px] font-bold" style={{ color: isConfirmed ? 'var(--income-color)' : 'var(--warning-color)' }}>
+                {isConfirmed ? '今月支払い確定' : '未確定'}
+              </span>
+            </div>
+            <div className="font-bold truncate text-base leading-tight">{transaction.content || '名称未設定'}</div>
           </div>
           <div className="text-right ml-md flex-shrink-0">
-            <div className="font-bold text-expense" style={{ fontSize: '1.2rem', lineHeight: '1.2' }}>¥{transaction.amount.toLocaleString()}</div>
-            <div className="text-xs font-semibold mt-1" style={{ color: isConfirmed ? 'var(--income-color)' : 'var(--warning-color)' }}>
-              {isConfirmed ? '今月支払い分' : '未確定'}
-            </div>
+            <div className="font-bold text-expense text-lg">{formatCurrency(transaction.amount)}</div>
           </div>
         </div>
       </div>
@@ -98,23 +104,27 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, categoryName }) =>
 
 export default function CardPage() {
   const navigate = useNavigate();
-  const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
   const categories = useLiveQuery(() => db.categories.toArray()) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState('');
 
-  const bankAssets = assets.filter(a => a.type === 'bank');
-  const unconfirmedAndConfirmed = transactions.filter(t => t.cardStatus === 'unconfirmed' || t.cardStatus === 'confirmed')
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Optimized query: only fetch unconfirmed or confirmed transactions
+  const unconfirmedAndConfirmed = useLiveQuery(() => 
+    db.transactions
+      .where('cardStatus').anyOf(['unconfirmed', 'confirmed'])
+      .toArray()
+      .then(items => items.sort((a, b) => b.date.localeCompare(a.date)))
+  ) || [];
 
   const confirmedSum = unconfirmedAndConfirmed.filter(t => t.cardStatus === 'confirmed').reduce((sum, t) => sum + t.amount, 0);
+
+  const bankAssets = assets.filter(a => a.type === 'bank');
 
   const handleConfirm = async (id) => { await db.transactions.update(id, { cardStatus: 'confirmed' }); };
   const handleUnconfirm = async (id) => { await db.transactions.update(id, { cardStatus: 'unconfirmed' }); };
 
   const openPayModal = () => {
-    const bankAssets = assets.filter(a => a.type === 'bank');
     if (bankAssets.length === 0) return alert('引き落とし元の銀行口座が登録されていません。');
     setSelectedBankId(bankAssets[0].id);
     setShowPayModal(true);
@@ -125,7 +135,6 @@ export default function CardPage() {
     const creditAssetId = creditAssets[0]?.id;
     if (!creditAssetId) return alert('エラー：クレジットカードが見つかりません');
 
-    // 1. 振替記録を作成
     await db.transactions.add({
       id: crypto.randomUUID(),
       type: 'transfer',
@@ -137,7 +146,6 @@ export default function CardPage() {
       createdAt: new Date().toISOString()
     });
 
-    // 2. 確定済みのカード利用を 'paid' に変更
     const confirmedTxs = unconfirmedAndConfirmed.filter(t => t.cardStatus === 'confirmed');
     const updatePromises = confirmedTxs.map(t => db.transactions.update(t.id, { cardStatus: 'paid' }));
     await Promise.all(updatePromises);
@@ -223,7 +231,7 @@ export default function CardPage() {
           <SwipeableItem 
             key={tx.id} 
             transaction={tx} 
-            categoryName={categories.find(c => c.id === tx.categoryId)?.name || ''}
+            category={categories.find(c => c.id === tx.categoryId)}
             onConfirm={() => handleConfirm(tx.id)}
             onUnconfirm={() => handleUnconfirm(tx.id)}
           />

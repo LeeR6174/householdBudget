@@ -17,23 +17,25 @@ export default function TransactionItem({ transaction, categories, assets, onCli
       <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
         <div className="flex items-center gap-md flex-1 min-w-0">
           <div 
-            style={{ backgroundColor: '#f1f5f9', color: '#64748b', border: '0' }}
-            className="w-11 h-11 rounded-full flex-center font-bold text-xs flex-shrink-0"
+            className="category-block"
+            style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}
           >
             振替
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <div className="text-xs text-secondary mb-xs">
-              {formatDate(transaction.date)}
-            </div>
-            <div className="font-bold flex items-center gap-sm text-base truncate leading-tight">
+            <div className="font-bold flex items-center gap-sm text-base truncate leading-tight mb-xs">
               <span>{fromAsset?.name || '不明'}</span>
               <ArrowRight size={14} className="text-secondary" />
               <span>{toAsset?.name || '不明'}</span>
             </div>
-            {transaction.content && (
-              <div className="text-xs text-secondary truncate mt-xs opacity-70">{transaction.content}</div>
-            )}
+            <div className="flex items-center gap-sm">
+              <span className="text-xs text-secondary truncate" style={{ opacity: 0.7 }}>
+                {transaction.content || '口座間振替'}
+              </span>
+              <span className="text-xs text-secondary ml-auto" style={{ opacity: 0.6 }}>
+                {formatDate(transaction.date)}
+              </span>
+            </div>
           </div>
         </div>
         <div className="font-bold text-secondary text-right ml-md flex-shrink-0">
@@ -48,28 +50,22 @@ export default function TransactionItem({ transaction, categories, assets, onCli
     <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
       <div className="flex items-center gap-md flex-1 min-w-0">
         <div 
-          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff', border: '0', fontSize: '1.2rem' }}
-          className="w-11 h-11 rounded-full flex-center font-bold flex-shrink-0"
+          className="category-block"
+          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff' }}
         >
-          {category?.name?.[0] || '?'}
+          {category?.name?.slice(0, 4) || '?'}
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="flex items-center gap-sm mb-xs">
-            <span 
-              className="category-pill" 
-              style={{ backgroundColor: `${category?.color || '#64748b'}15`, color: category?.color || '#64748b', fontSize: '0.7rem' }}
-            >
-              {category?.name || '不明'}
-            </span>
+          <div className="font-bold text-base truncate leading-tight mb-xs">
+            {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '未設定'}
+          </div>
+          <div className="flex items-center gap-sm">
             <span className="text-xs text-secondary truncate" style={{ opacity: 0.7 }}>
               {asset?.name || '不明'}
             </span>
             <span className="text-xs text-secondary ml-auto" style={{ opacity: 0.6 }}>
               {formatDate(transaction.date)}
             </span>
-          </div>
-          <div className="font-bold text-base truncate leading-tight">
-            {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '未設定'}
           </div>
         </div>
       </div>

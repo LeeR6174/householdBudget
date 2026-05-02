@@ -27,7 +27,7 @@ export default function HomePage() {
   
   const currentMonthTx = useLiveQuery(() => {
     return db.transactions
-      .filter(tx => tx.date >= startDate && tx.date <= endDate)
+      .where('date').between(startDate, endDate, true, true)
       .toArray()
       .then(items => items.sort((a, b) => {
         if (a.date !== b.date) return b.date.localeCompare(a.date);
