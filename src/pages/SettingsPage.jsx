@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const fileInputRef = useRef(null);
   const backupInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('data'); // 'data' or 'notifications'
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Notification form state
   const [notifyDay, setNotifyDay] = useState(1);
@@ -36,6 +37,39 @@ export default function SettingsPage() {
   const handleDeleteNotification = async (id) => {
     if (window.confirm('この通知を削除しますか？')) {
       await db.notifications.delete(id);
+    }
+  };
+
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Rate limit check: 1 minute
+    const lastSubmit = localStorage.getItem('lastFeedbackTimestamp');
+    const now = Date.now();
+    if (lastSubmit && now - Number(lastSubmit) < 60 * 1000) {
+      alert('連続での送信は控え、少し時間を置いてから再度お試しください。');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    try {
+      await fetch("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(formData).toString(),
+      });
+      localStorage.setItem('lastFeedbackTimestamp', Date.now().toString());
+      alert('フィードバックを送信しました。ありがとうございます！');
+      form.reset();
+    } catch (error) {
+      console.error(error);
+      alert('送信に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -376,25 +410,57 @@ export default function SettingsPage() {
 
       <div className="card mt-lg">
         <h3 className="font-bold mb-md">お問い合わせ・フィードバック</h3>
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSdeaUhqb6sWCcu6YEv3L7G3X4Ut2DOR0EHLglBbP1oQjXtyxQ/viewform?usp=publish-editor" target="_blank" rel="noopener noreferrer" className="btn btn-outline w-full font-bold">📩 意見フォームはこちら</a>
+        <p className="text-sm text-secondary mb-md">改善の要望や不具合報告など、お気軽にお寄せください。</p>
+        
+        <form 
+          name="feedback" 
+          method="POST" 
+          data-netlify="true" 
+          onSubmit={handleFeedbackSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+        >
+          <input type="hidden" name="form-name" value="feedback" />
+          <div className="form-group mb-0">
+            <label className="form-label text-xs">お名前 (任意)</label>
+            <input type="text" name="name" className="form-control" style={{ padding: '10px' }} />
+          </div>
+          <div className="form-group mb-0">
+            <label className="form-label text-xs">メールアドレス (任意)</label>
+            <input type="email" name="email" className="form-control" style={{ padding: '10px' }} />
+          </div>
+          <div className="form-group mb-0">
+            <label className="form-label text-xs">種類</label>
+            <select name="type" className="form-control" style={{ padding: '10px' }}>
+              <option value="bug">不具合報告</option>
+              <option value="request">要望</option>
+              <option value="other">その他</option>
+            </select>
+          </div>
+          <div className="form-group mb-0">
+            <label className="form-label text-xs">内容</label>
+            <textarea name="message" className="form-control" rows="4" required style={{ padding: '10px' }}></textarea>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+            {isSubmitting ? '送信中...' : '📩 意見を送信する'}
+          </button>
+        </form>
       </div>
 
       <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-        <h3 className="font-bold mb-md">アップデート内容 (V1.1.1.3)</h3>
+        <h3 className="font-bold mb-md">アップデート内容 (V1.2.0.0)</h3>
         <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
           <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            <li>履歴の並び順を完全に降順（日付・入力順ともに新しい順）に統一</li>
-            <li>設定画面に「通知設定」タブを追加、毎月のリマインドを自由に追加可能に</li>
-            <li>ホーム画面の予算表示を「今月の残り支出」に変更</li>
-            <li>ホームの各カテゴリをタップして直接予算や設定を編集できる機能を追加</li>
-            <li>通知音をオフにし、より静かにリマインドを受け取れるように改善</li>
+            <li>「内容」入力時の履歴サジェストを廃止し、即座に入力できるよう改善</li>
+            <li>カテゴリ表示をアイコンから「4文字固定のカラーブロック」に刷新し、一覧性を向上</li>
+            <li>履歴、分析、カード管理のデータ読み込み速度を大幅に高速化</li>
+            <li>全体的なデザインの統一感と、初期設定時の安定性を向上</li>
           </ul>
         </div>
       </div>
 
       <div className="text-center mt-xl mb-lg opacity-50">
         <div className="text-xs font-bold">格が違う家計簿</div>
-        <div className="text-[10px]">Version 1.1.1.3</div>
+        <div className="text-[10px]">Version 1.2.0.0</div>
       </div>
     </div>
   );
