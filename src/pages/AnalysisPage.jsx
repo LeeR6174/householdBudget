@@ -8,7 +8,7 @@ import { db } from '../db/db';
 import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
 import MonthSelector from '../components/MonthSelector';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, Calendar } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, Calendar, HelpCircle } from 'lucide-react';
 
 export default function AnalysisPage() {
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
@@ -165,6 +165,7 @@ export default function AnalysisPage() {
   };
 
   const [activeTab, setActiveTab] = useState('summary'); // 'summary', 'categories', 'weekday'
+  const [showSavingsHelp, setShowSavingsHelp] = useState(false);
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
@@ -197,17 +198,17 @@ export default function AnalysisPage() {
         <div className="animate-fade-in">
           {/* 1. 収支サマリー & 貯蓄率 */}
           <div className="grid grid-cols-2 gap-md mb-md" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="card" style={{ margin: 0, padding: '12px' }}>
+            <div className="card" style={{ margin: 0, padding: '16px', backgroundColor: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
               <div className="text-[10px] text-secondary font-bold mb-xs flex items-center gap-xs">
                 <ArrowUpRight size={12} className="text-income" /> 収入
               </div>
-              <div className="text-lg font-bold text-income">{formatCurrency(analytics.income)}</div>
+              <div className="text-xl font-bold text-income">{formatCurrency(analytics.income)}</div>
             </div>
-            <div className="card" style={{ margin: 0, padding: '12px' }}>
+            <div className="card" style={{ margin: 0, padding: '16px', backgroundColor: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.1)' }}>
               <div className="text-[10px] text-secondary font-bold mb-xs flex items-center gap-xs">
                 <ArrowDownRight size={12} className="text-expense" /> 支出
               </div>
-              <div className="text-lg font-bold text-expense">{formatCurrency(analytics.expense)}</div>
+              <div className="text-xl font-bold text-expense">{formatCurrency(analytics.expense)}</div>
             </div>
           </div>
 
@@ -229,30 +230,44 @@ export default function AnalysisPage() {
             </div>
           </div>
 
-          {/* 貯蓄率の詳細説明 */}
-          <div className="card mb-lg" style={{ backgroundColor: 'rgba(79, 70, 229, 0.05)', border: '1px solid rgba(79, 70, 229, 0.1)', padding: '20px' }}>
-            <h4 className="text-sm font-bold text-primary mb-md flex items-center gap-xs">
-              <TrendingUp size={16} /> 貯蓄率をマスターする
-            </h4>
-            <p className="text-xs text-secondary leading-relaxed mb-md">
-              貯蓄率は、手取り収入のうち「どれだけを将来のために残せたか」を示す指標です。この数字が高いほど、経済的な自由へのスピードが速まります。
-            </p>
-            <div className="grid grid-cols-1 gap-md">
-              <div className="flex items-center gap-md p-md rounded-xl bg-white shadow-sm border border-slate-50">
-                <div className="w-10 h-10 rounded-full flex-center flex-shrink-0 font-black text-xs" style={{ backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary-color)' }}>式</div>
-                <div className="text-[11px] text-secondary">
-                  <span className="font-bold text-primary block mb-xs">計算方法</span>
-                  (収入 - 支出) ÷ 収入 × 100
-                </div>
-              </div>
-              <div className="flex items-center gap-md p-md rounded-xl bg-white shadow-sm border border-slate-50">
-                <div className="w-10 h-10 rounded-full flex-center flex-shrink-0 font-black text-xs" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--income-color)' }}>20</div>
-                <div className="text-[11px] text-secondary">
-                  <span className="font-bold text-income block mb-xs">目標: 20%以上</span>
-                  20%を超えると資産形成が加速します。まずはこのラインを目指して家計を最適化しましょう。
-                </div>
-              </div>
+          {/* 貯蓄率の簡潔な説明 */}
+          <div className="card mb-lg" style={{ backgroundColor: 'rgba(79, 70, 229, 0.05)', border: '1px solid rgba(79, 70, 229, 0.1)', padding: '16px' }}>
+            <div className="flex-between items-center mb-sm">
+              <h4 className="text-sm font-bold text-primary flex items-center gap-xs">
+                <TrendingUp size={16} /> 貯蓄率について
+              </h4>
+              <button 
+                onClick={() => setShowSavingsHelp(!showSavingsHelp)}
+                className="flex items-center gap-xs text-[10px] font-bold text-primary opacity-70 hover:opacity-100 transition-opacity"
+              >
+                <HelpCircle size={14} /> 詳しく見る
+              </button>
             </div>
+            
+            <p className="text-xs text-secondary leading-relaxed">
+              収入のうち、どれだけを将来のために残せたかを示す指標です。資産形成のスピードを測る重要な数字です。
+            </p>
+
+            {showSavingsHelp && (
+              <div className="mt-md animate-fade-in">
+                <div className="grid grid-cols-1 gap-md">
+                  <div className="flex items-center gap-md p-md rounded-xl bg-white shadow-sm border border-slate-50">
+                    <div className="w-10 h-10 rounded-full flex-center flex-shrink-0 font-black text-xs" style={{ backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary-color)' }}>式</div>
+                    <div className="text-[11px] text-secondary">
+                      <span className="font-bold text-primary block mb-xs">計算方法</span>
+                      (収入 - 支出) ÷ 収入 × 100
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-md p-md rounded-xl bg-white shadow-sm border border-slate-50">
+                    <div className="w-10 h-10 rounded-full flex-center flex-shrink-0 font-black text-xs" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--income-color)' }}>20</div>
+                    <div className="text-[11px] text-secondary">
+                      <span className="font-bold text-income block mb-xs">目標: 20%以上</span>
+                      20%を超えると資産形成が加速します。まずはこのラインを目指して家計を最適化しましょう。
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. 推移グラフ */}
@@ -271,8 +286,8 @@ export default function AnalysisPage() {
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} tickFormatter={(v) => v >= 10000 ? `${v/10000}万` : v} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" name="収入" dataKey="income" stroke="var(--income-color)" strokeWidth={3} fill="url(#colorInc)" />
-                  <Area type="monotone" name="支出" dataKey="expense" stroke="var(--expense-color)" strokeWidth={3} fill="url(#colorExp)" />
+                  <Area type="monotone" name="収入" dataKey="income" stroke="var(--income-color)" strokeWidth={3} fill="url(#colorInc)" animationDuration={1500} />
+                  <Area type="monotone" name="支出" dataKey="expense" stroke="var(--expense-color)" strokeWidth={3} fill="url(#colorExp)" animationDuration={1500} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -286,10 +301,19 @@ export default function AnalysisPage() {
               <div style={{ width: '50%', height: 140 }}>
                 <ResponsiveContainer>
                   <PieChart>
-                    <Pie data={paymentChartData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
+                    <Pie 
+                      data={paymentChartData} 
+                      innerRadius={40} 
+                      outerRadius={60} 
+                      paddingAngle={5} 
+                      dataKey="value"
+                      startAngle={90}
+                      endAngle={-270}
+                      animationDuration={1000}
+                    >
                       {paymentChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -297,8 +321,8 @@ export default function AnalysisPage() {
                 {paymentChartData.map((item, i) => (
                   <div key={i} className="flex-between items-center mb-xs">
                     <div className="flex items-center gap-xs">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                      <span className="text-[10px] font-bold text-secondary">{item.name}</span>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-xs font-bold text-secondary">{item.name}</span>
                     </div>
                     <span className="text-xs font-bold">{((item.value / analytics.expense) * 100).toFixed(0)}%</span>
                   </div>
@@ -326,6 +350,9 @@ export default function AnalysisPage() {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
+                    startAngle={90}
+                    endAngle={-270}
+                    animationDuration={1200}
                   >
                     {categoryChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -349,9 +376,13 @@ export default function AnalysisPage() {
                         {item.name.slice(0, 4)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-base truncate mb-1">{item.name}</div>
-                        <div className="progress-container" style={{ height: '4px', backgroundColor: 'rgba(0,0,0,0.05)' }}>
-                          <div className="progress-bar" style={{ width: `${(item.value / analytics.expense) * 100}%`, backgroundColor: item.color }}></div>
+                        <div className="font-bold text-sm truncate mb-1">{item.name}</div>
+                        <div className="progress-container" style={{ height: '6px', backgroundColor: 'rgba(0,0,0,0.03)' }}>
+                          <div className="progress-bar" style={{ 
+                            width: `${(item.value / analytics.expense) * 100}%`, 
+                            backgroundColor: item.color,
+                            boxShadow: `0 0 8px ${item.color}44`
+                          }}></div>
                         </div>
                       </div>
                     </div>
@@ -387,7 +418,7 @@ export default function AnalysisPage() {
                     tickFormatter={(v) => v >= 10000 ? `${(v/10000).toFixed(1).replace('.0', '')}万` : v} 
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="avg" radius={[4, 4, 0, 0]} name="平均支出">
+                  <Bar dataKey="avg" radius={[4, 4, 0, 0]} name="平均支出" animationDuration={1000}>
                     {analytics.weekdayChartData.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
