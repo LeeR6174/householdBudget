@@ -133,10 +133,10 @@ export default function AnalysisPage() {
       .map(cat => ({
         name: cat.name,
         value: analytics.catExpenses[cat.id] || 0,
-        color: cat.color || '#8884d8'
+        fill: cat.color || '#8884d8'
       }));
     if (analytics.catExpenses['uncategorized'] > 0) {
-      data.push({ name: '未分類・不明', value: analytics.catExpenses['uncategorized'], color: '#9ca3af' });
+      data.push({ name: '未分類・不明', value: analytics.catExpenses['uncategorized'], fill: '#9ca3af' });
     }
     return data.filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   }, [categories, analytics.catExpenses]);
@@ -320,8 +320,8 @@ export default function AnalysisPage() {
               <div className="flex-1">
                 {paymentChartData.map((item, i) => (
                   <div key={i} className="flex-between items-center mb-xs">
-                    <div className="flex items-center gap-xs">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
+                    <div className="flex items-center gap-sm">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
                       <span className="text-xs font-bold text-secondary">{item.name}</span>
                     </div>
                     <span className="text-xs font-bold">{((item.value / analytics.expense) * 100).toFixed(0)}%</span>
@@ -355,7 +355,7 @@ export default function AnalysisPage() {
                     animationDuration={1200}
                   >
                     {categoryChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />

@@ -438,7 +438,13 @@ export default function SettingsPage() {
           </div>
           <div className="form-group mb-0">
             <label className="form-label text-xs">内容</label>
-            <textarea name="message" className="form-control" rows="4" required style={{ padding: '10px' }}></textarea>
+            <textarea 
+              name="message" 
+              className="form-control" 
+              rows="4" 
+              required 
+              style={{ padding: '10px', overflowY: 'auto', touchAction: 'auto' }}
+            ></textarea>
           </div>
           <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
             {isSubmitting ? '送信中...' : '📩 意見を送信する'}

@@ -44,7 +44,7 @@
 
 /* Base resets for UX & Responsiveness */
 html, body {
-  overscroll-behavior-y: none; /* Prevents pull-to-refresh & scroll bouncing anomalies */
+  overscroll-behavior-y: auto; /* Changed from none to auto to fix form scroll issues */
 }
 
 body {
@@ -109,6 +109,14 @@ button, a, input, select, textarea, .list-item, .card {
 }
 
 /* Utilities */
+.w-2 { width: 8px; }
+.h-2 { height: 8px; }
+.w-2\.5 { width: 10px; }
+.h-2\.5 { height: 10px; }
+.w-3 { width: 12px; }
+.h-3 { height: 12px; }
+.w-4 { width: 16px; }
+.h-4 { height: 16px; }
 .w-10 { width: 40px; }
 .h-10 { height: 40px; }
 .w-11 { width: 44px; }
@@ -158,6 +166,16 @@ button, a, input, select, textarea, .list-item, .card {
   transition: all 0.2s ease;
   background-color: #f8fafc;
   color: var(--text-primary);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+textarea.form-control {
+  min-height: 100px;
+  resize: vertical;
+  line-height: 1.6;
+  overflow-y: auto;
+  touch-action: auto; /* Explicitly allow scrolling in textarea */
 }
 
 .form-control:focus {
