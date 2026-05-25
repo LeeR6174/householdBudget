@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
+import { getCurrentBudgetMonth } from '../utils/dateUtils';
+import { ensurePastBudgets } from '../utils/budgetUtils';
 
 export default function BudgetPage() {
   const expenseCategories = useLiveQuery(() => db.categories.where('type').equals('expense').toArray()) || [];
@@ -17,6 +19,11 @@ export default function BudgetPage() {
 
   const handleSave = async (id) => {
     try {
+      const cat = expenseCategories.find(c => c.id === id);
+      const oldLimit = cat?.monthlyLimit || 0;
+      const currentMonthStr = getCurrentBudgetMonth();
+      await ensurePastBudgets(id, oldLimit, currentMonthStr);
+
       await db.categories.update(id, { monthlyLimit: Number(tempLimit) });
       setEditingId(null);
     } catch (err) {

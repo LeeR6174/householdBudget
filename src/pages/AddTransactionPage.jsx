@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Plus } from 'lucide-react';
 import { db } from '../db/db';
 
 export default function AddTransactionPage() {
@@ -21,6 +21,36 @@ export default function AddTransactionPage() {
   const [content, setContent] = useState('');
   const [memo, setMemo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState('#9ca3af');
+
+  const handleAddCategorySubmit = async (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+
+    try {
+      const newId = `cat_custom_${Date.now()}`;
+      const newCat = {
+        id: newId,
+        name: newCatName.trim(),
+        type,
+        color: newCatColor,
+        monthlyLimit: 0,
+        isCarryover: false,
+        description: ''
+      };
+      await db.categories.add(newCat);
+      setCategoryId(newId);
+      setIsAddingCategory(false);
+      setNewCatName('');
+      setNewCatColor('#9ca3af');
+    } catch (err) {
+      console.error(err);
+      alert('カテゴリの追加に失敗しました');
+    }
+  };
 
   const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
@@ -184,7 +214,18 @@ export default function AddTransactionPage() {
             </div>
             
             <div className="form-group">
-              <label className="form-label">カテゴリ</label>
+              <div className="flex-between mb-xs">
+                <label className="form-label" style={{ marginBottom: 0 }}>カテゴリ</label>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', height: 'auto', width: 'auto' }}
+                  onClick={() => setIsAddingCategory(true)}
+                >
+                  <Plus size={14} style={{ marginRight: '2px', display: 'inline', verticalAlign: 'middle' }} />
+                  新規追加
+                </button>
+              </div>
               <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
                 <option value="" disabled>分類を選択</option>
                 {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
@@ -237,6 +278,67 @@ export default function AddTransactionPage() {
           {isEditing ? '更新する' : '保存する'}
         </button>
       </form>
+
+      {isAddingCategory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', margin: 0, zIndex: 1001 }}>
+            <h3 className="font-bold mb-md">新規カテゴリの追加 ({type === 'expense' ? '支出' : '収入'})</h3>
+            <form onSubmit={handleAddCategorySubmit}>
+              <div className="form-group mb-md">
+                <label className="form-label">カテゴリ名</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={newCatName} 
+                  onChange={e => setNewCatName(e.target.value)} 
+                  required 
+                  placeholder="例: 交際費" 
+                  autoFocus
+                />
+              </div>
+              <div className="form-group mb-md">
+                <label className="form-label">カラー</label>
+                <input 
+                  type="color" 
+                  className="form-control" 
+                  style={{ padding: '4px', height: '46px' }} 
+                  value={newCatColor} 
+                  onChange={e => setNewCatColor(e.target.value)} 
+                />
+              </div>
+              <div className="flex gap-sm">
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                  追加
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    setIsAddingCategory(false);
+                    setNewCatName('');
+                    setNewCatColor('#9ca3af');
+                  }}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       </>
       )}
     </div>
