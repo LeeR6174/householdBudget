@@ -453,21 +453,19 @@ export default function SettingsPage() {
       </div>
 
       <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-        <h3 className="font-bold mb-md">アップデート内容 (V1.4.0.0)</h3>
+        <h3 className="font-bold mb-md">アップデート内容 (V1.5.0.0)</h3>
         <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
           <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            <li>分析ページの円グラフを改善！時計回りに大きい順で表示されるよう調整</li>
-            <li>貯蓄率の説明を簡潔化し、詳細情報をヘルプボタンで表示する機能を追加</li>
-            <li>支払い方法別チャートの凡例を大きくし、視認性を向上</li>
-            <li>チャートのアニメーションやUIの微調整を行い、よりプレミアムな体験へ</li>
-            <li>分析ページを刷新！貯蓄率、支払い方法、曜日別傾向など高度な分析に対応</li>
+            <li>新規取引の追加・編集画面から、その場でカテゴリを直接追加できるボタンを追加しました。</li>
+            <li>カテゴリの通常予算（積立額）を変更しても、過去の月の予算や積立額に影響しないよう歴史を保護する機能を実装しました。</li>
+            <li>システム全体の安定性向上と細かな不具合の修正。</li>
           </ul>
         </div>
       </div>
 
       <div className="text-center mt-xl mb-lg opacity-50">
         <div className="text-xs font-bold">格が違う家計簿</div>
-        <div className="text-[10px]">Version 1.4.0.0</div>
+        <div className="text-[10px]">Version 1.5.0.0</div>
       </div>
     </div>
   );

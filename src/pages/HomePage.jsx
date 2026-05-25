@@ -106,6 +106,9 @@ export default function HomePage() {
 
   // 予算合計の計算
   const budgetMap = {};
+  monthlyBudgets.forEach(b => {
+    budgetMap[b.categoryId] = b.budget;
+  });
   // カテゴリごとにデータを整理（計算高速化のため）
   const txByCategory = {};
   allTx.forEach(t => {

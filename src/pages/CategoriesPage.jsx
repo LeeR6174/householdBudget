@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Trash2, Edit2, Plus } from 'lucide-react';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth } from '../utils/dateUtils';
+import { ensurePastBudgets } from '../utils/budgetUtils';
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
@@ -100,6 +101,10 @@ export default function CategoriesPage() {
     };
 
     if (editId) {
+      const oldCat = categories.find(c => c.id === editId);
+      const oldLimit = oldCat?.monthlyLimit || 0;
+      await ensurePastBudgets(editId, oldLimit, currentMonthStr);
+
       await db.categories.update(editId, catData);
       // Save monthly budget if specified
       if (thisMonthBudget !== '') {

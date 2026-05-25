@@ -1,3 +1,4 @@
+import { db } from '../db/db';
 import { getPrevMonth, getBudgetMonth } from './dateUtils';
 
 /**
@@ -51,3 +52,49 @@ export const calculateCarryoverBalance = (category, currentMonth, categoryTransa
 
   return totalAllocated - totalSpent;
 };
+
+/**
+ * Ensures that all past months (since the category was first active up to the month before targetMonthStr)
+ * have an explicit override entry in the database. This protects past budgets from changing when
+ * the default monthlyLimit of the category is modified.
+ */
+export const ensurePastBudgets = async (categoryId, oldLimit, targetMonthStr) => {
+  const categoryTransactions = await db.transactions.where('categoryId').equals(categoryId).toArray();
+  const categoryBudgets = await db.monthlyBudgets.where('categoryId').equals(categoryId).toArray();
+
+  let months = [];
+  categoryTransactions.forEach(t => months.push(getBudgetMonth(t.date)));
+  categoryBudgets.forEach(b => months.push(b.month));
+
+  if (months.length === 0) {
+    return;
+  }
+
+  months.sort();
+  const startMonth = months[0];
+  const endMonth = getPrevMonth(targetMonthStr);
+
+  let tempMonth = startMonth;
+  let safety = 0;
+  while (tempMonth <= endMonth && safety < 120) {
+    const existing = categoryBudgets.find(b => b.month === tempMonth);
+    if (!existing) {
+      await db.monthlyBudgets.add({
+        categoryId,
+        month: tempMonth,
+        budget: Number(oldLimit) || 0
+      });
+    }
+
+    const [y, m] = tempMonth.split('-');
+    let year = parseInt(y, 10);
+    let month = parseInt(m, 10) + 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+    tempMonth = `${year}-${String(month).padStart(2, '0')}`;
+    safety++;
+  }
+};
+
