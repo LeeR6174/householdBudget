@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Plus } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { db } from '../db/db';
 
 export default function AddTransactionPage() {
@@ -52,7 +52,7 @@ export default function AddTransactionPage() {
     }
   };
 
-  const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray(), [type]) || [];
+  const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))), [type]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   // Fetch existing transaction if editing
   const existingTx = useLiveQuery(async () => {
@@ -133,6 +133,18 @@ export default function AddTransactionPage() {
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm('この記録を削除しますか？')) {
+      try {
+        await db.transactions.delete(id);
+        navigate(-1);
+      } catch (err) {
+        console.error(err);
+        alert('削除に失敗しました');
+      }
     }
   };
 
@@ -277,6 +289,16 @@ export default function AddTransactionPage() {
         <button type="submit" className="btn btn-primary w-full shadow-lg text-lg py-3">
           {isEditing ? '更新する' : '保存する'}
         </button>
+        {isEditing && (
+          <button 
+            type="button" 
+            className="btn btn-danger w-full mt-md text-lg py-3 flex-center gap-sm"
+            onClick={handleDelete}
+          >
+            <Trash2 size={20} />
+            この記録を削除する
+          </button>
+        )}
       </form>
 
       {isAddingCategory && (

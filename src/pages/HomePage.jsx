@@ -16,7 +16,7 @@ export default function HomePage() {
   const { startDate, endDate } = getMonthRange(currentMonth);
 
   // Queries
-  const categories = useLiveQuery(() => db.categories.toArray()) || [];
+  const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const settings = useLiveQuery(() => db.settings.get('master'));
   const monthlyBudgets = useLiveQuery(() => db.monthlyBudgets.where('month').equals(currentMonth).toArray(), [currentMonth]) || [];

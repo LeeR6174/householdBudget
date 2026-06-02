@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Trash2, Edit2, Plus } from 'lucide-react';
+import { ChevronLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth } from '../utils/dateUtils';
 import { ensurePastBudgets } from '../utils/budgetUtils';
@@ -9,7 +9,7 @@ import { ensurePastBudgets } from '../utils/budgetUtils';
 export default function CategoriesPage() {
   const navigate = useNavigate();
   const formRef = useRef(null);
-  const categories = useLiveQuery(() => db.categories.toArray()) || [];
+  const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   
   const [searchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
@@ -87,6 +87,33 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleMove = async (catsList, currentIndex, direction) => {
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= catsList.length) return;
+
+    const updatedCats = catsList.map((c, idx) => ({
+      ...c,
+      sortOrder: c.sortOrder ?? idx
+    }));
+
+    const currentCat = updatedCats[currentIndex];
+    const targetCat = updatedCats[targetIndex];
+
+    const tempOrder = currentCat.sortOrder;
+    currentCat.sortOrder = targetCat.sortOrder;
+    targetCat.sortOrder = tempOrder;
+
+    try {
+      await db.transaction('rw', db.categories, async () => {
+        await db.categories.update(currentCat.id, { sortOrder: currentCat.sortOrder });
+        await db.categories.update(targetCat.id, { sortOrder: targetCat.sortOrder });
+      });
+    } catch (err) {
+      console.error(err);
+      alert('並び替えの保存に失敗しました');
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!name.trim()) return alert('カテゴリ名を入力してください');
@@ -128,6 +155,12 @@ export default function CategoriesPage() {
     } else {
       const newId = `cat_custom_${Date.now()}`;
       catData.id = newId;
+      
+      // Calculate next sort order
+      const sameTypeCats = categories.filter(c => c.type === type);
+      const maxOrder = sameTypeCats.reduce((max, c) => Math.max(max, c.sortOrder ?? 0), -1);
+      catData.sortOrder = maxOrder + 1;
+      
       await db.categories.add(catData);
       
       if (thisMonthBudget !== '') {
@@ -143,7 +176,7 @@ export default function CategoriesPage() {
   const CategoryList = ({ cats, title }) => (
     <div className="mb-lg">
       <h3 className="font-bold mb-sm text-secondary">{title}</h3>
-      {cats.map(cat => (
+      {cats.map((cat, index) => (
         <div key={cat.id} className="list-item" style={{ padding: '8px 0' }}>
           <div className="flex-center gap-sm">
             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color || '#333' }}></div>
@@ -152,7 +185,27 @@ export default function CategoriesPage() {
               {cat.description && <span className="text-xs text-secondary">{cat.description}</span>}
             </div>
           </div>
-          <div className="flex gap-sm" style={{ flexShrink: 0 }}>
+          <div className="flex gap-xs" style={{ flexShrink: 0 }}>
+            <button 
+              type="button"
+              onClick={() => handleMove(cats, index, -1)} 
+              className="btn-icon" 
+              disabled={index === 0}
+              style={{ opacity: index === 0 ? 0.3 : 1, cursor: index === 0 ? 'not-allowed' : 'pointer' }}
+              title="上に移動"
+            >
+              <ChevronUp size={18} />
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleMove(cats, index, 1)} 
+              className="btn-icon" 
+              disabled={index === cats.length - 1}
+              style={{ opacity: index === cats.length - 1 ? 0.3 : 1, cursor: index === cats.length - 1 ? 'not-allowed' : 'pointer' }}
+              title="下に移動"
+            >
+              <ChevronDown size={18} />
+            </button>
             <button onClick={() => handleEdit(cat)} className="btn-icon" title="編集">
               <Edit2 size={18} />
             </button>

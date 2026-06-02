@@ -15,7 +15,7 @@ export default function AnalysisPage() {
   const { startDate, endDate } = getMonthRange(currentMonth);
 
   // 1. 基本データ取得
-  const categories = useLiveQuery(() => db.categories.toArray()) || [];
+  const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   
   // 過去6ヶ月分のトレンド用データを取得

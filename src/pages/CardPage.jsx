@@ -104,7 +104,7 @@ const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, category }) => {
 
 export default function CardPage() {
   const navigate = useNavigate();
-  const categories = useLiveQuery(() => db.categories.toArray()) || [];
+  const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState('');

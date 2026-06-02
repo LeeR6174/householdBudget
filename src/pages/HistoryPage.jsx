@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Trash2, Filter, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
@@ -39,7 +39,7 @@ export default function HistoryPage() {
     }));
   }, [currentMonth]);
 
-  const categories = useLiveQuery(() => db.categories.toArray()) || [];
+  const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
 
   const transactions = useLiveQuery(async () => {
@@ -73,11 +73,7 @@ export default function HistoryPage() {
     });
   }, [filters, assets]) || [];
 
-  const handleDelete = async (id) => {
-    if (window.confirm('この記録を削除しますか？')) {
-      await db.transactions.delete(id);
-    }
-  };
+
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -212,22 +208,13 @@ export default function HistoryPage() {
       
       <div className="card" style={{ padding: '0 16px' }}>
         {transactions.map(tx => (
-          <div key={tx.id} style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <TransactionItem 
-                transaction={tx} 
-                categories={categories} 
-                assets={assets} 
-                onClick={() => navigate(`/edit/${tx.id}`)}
-              />
-            </div>
-            <button 
-              onClick={() => handleDelete(tx.id)}
-              style={{ padding: '16px 0 16px 16px', border: 'none', background: 'transparent', color: 'var(--danger-color)', cursor: 'pointer' }}
-            >
-              <Trash2 size={20} />
-            </button>
-          </div>
+          <TransactionItem 
+            key={tx.id} 
+            transaction={tx} 
+            categories={categories} 
+            assets={assets} 
+            onClick={() => navigate(`/edit/${tx.id}`)}
+          />
         ))}
         {transactions.length === 0 && (
           <div className="text-center py-xl text-secondary">
