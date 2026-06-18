@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home, Clock, PieChart, Settings as SettingsIcon, CreditCard, BarChart2 } from 'lucide-react';
 import { initDB, db } from './db/db';
-import { getCurrentBudgetMonth } from './utils/dateUtils';
+import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from './utils/dateUtils';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -71,8 +71,8 @@ function App() {
               amount: sub.amount,
               content: sub.content,
               memo: sub.memo || '自動入力(サブスク)',
-              date: today.toISOString().split('T')[0],
-              createdAt: new Date().toISOString(),
+              date: getLocalDateString(),
+              createdAt: getLocalISOString(),
               cardStatus: 'unconfirmed'
             });
             await db.subscriptions.update(sub.id, { lastProcessedMonth: currentBudgetMonth });

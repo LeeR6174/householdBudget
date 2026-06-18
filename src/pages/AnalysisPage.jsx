@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area, Legend, PieChart, Pie
 } from 'recharts';
 import { db } from '../db/db';
-import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getMonthRange, getLocalDateString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
 import MonthSelector from '../components/MonthSelector';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, Calendar, HelpCircle } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function AnalysisPage() {
   const trendStartDate = useMemo(() => {
     const d = new Date(startDate);
     d.setMonth(d.getMonth() - 5);
-    return d.toISOString().slice(0, 7) + '-01';
+    return getLocalDateString(d).slice(0, 7) + '-01';
   }, [startDate]);
 
   const allRelevantTx = useLiveQuery(() => 
@@ -115,7 +115,7 @@ export default function AnalysisPage() {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(startDate);
       d.setMonth(d.getMonth() - i);
-      months.push(d.toISOString().slice(0, 7));
+      months.push(getLocalDateString(d).slice(0, 7));
     }
 
     return months.map(m => {

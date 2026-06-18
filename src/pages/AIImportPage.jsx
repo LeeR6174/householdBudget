@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Copy, Check, Info } from 'lucide-react';
 import { db } from '../db/db';
+import { getLocalISOString } from '../utils/dateUtils';
 
 export default function AIImportPage() {
   const navigate = useNavigate();
@@ -74,7 +75,7 @@ export default function AIImportPage() {
         assetId: selectedAssetId,
         categoryId: null, // カテゴリは後で設定
         memo: 'AIインポート',
-        createdAt: new Date().toISOString(),
+        createdAt: getLocalISOString(),
         cardStatus: 'unconfirmed'
       }));
 

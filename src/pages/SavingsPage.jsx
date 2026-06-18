@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Plus, Minus, History } from 'lucide-react';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth, getNextMonth } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getNextMonth, getLocalDateString } from '../utils/dateUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
@@ -22,12 +22,14 @@ export default function SavingsPage() {
   const [type, setType] = useState('depletion'); // depletion (切り崩し) or addition (追加)
 
   const initialSavings = settings?.targetSavings || 0;
-  const monthlyAdditions = allMonthlySettings.reduce((sum, s) => sum + (s.targetSavings || 0), 0);
+  const monthlyAdditions = allMonthlySettings
+    .filter(s => s.month <= currentMonthStr)
+    .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
   const totalDepletions = savingsRecords
-    .filter(r => r.type === 'depletion')
+    .filter(r => r.type === 'depletion' && r.month <= currentMonthStr)
     .reduce((sum, r) => sum + (r.amount || 0), 0);
   const extraAdditions = savingsRecords
-    .filter(r => r.type === 'addition')
+    .filter(r => r.type === 'addition' && r.month <= currentMonthStr)
     .reduce((sum, r) => sum + (r.amount || 0), 0);
 
   const currentTotalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
@@ -57,7 +59,7 @@ export default function SavingsPage() {
       amount: Number(amount),
       type,
       note: note.trim(),
-      date: new Date().toISOString().split('T')[0]
+      date: getLocalDateString()
     });
 
     setAmount('');
