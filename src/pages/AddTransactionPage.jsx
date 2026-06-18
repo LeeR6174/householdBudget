@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { db } from '../db/db';
+import { getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 
 export default function AddTransactionPage() {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function AddTransactionPage() {
   
   const [content, setContent] = useState('');
   const [memo, setMemo] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -97,7 +98,7 @@ export default function AddTransactionPage() {
         content,
         memo,
         date,
-        createdAt: isEditing ? (existingTx?.createdAt || new Date().toISOString()) : new Date().toISOString()
+        createdAt: isEditing ? (existingTx?.createdAt || getLocalISOString()) : getLocalISOString()
       };
 
       if (type === 'transfer') {

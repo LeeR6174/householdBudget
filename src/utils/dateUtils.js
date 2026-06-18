@@ -82,3 +82,28 @@ export const getMonthRange = (monthStr) => {
 export const getCurrentBudgetMonth = () => {
   return getBudgetMonth(new Date());
 };
+
+/**
+ * 現在のローカルタイムゾーンでの日付文字列 (YYYY-MM-DD) を取得する
+ */
+export const getLocalDateString = (dateParam = new Date()) => {
+  const d = new Date(dateParam);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * 現在のローカルタイムゾーンでの日時文字列 (YYYY-MM-DDTHH:mm:ss) を取得する
+ */
+export const getLocalISOString = (dateParam = new Date()) => {
+  const d = new Date(dateParam);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const secs = String(d.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${mins}:${secs}`;
+};

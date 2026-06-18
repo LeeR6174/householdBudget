@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { formatCurrency, formatDate } from '../utils/format';
+import { getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import { Check, Clock } from 'lucide-react';
 
 const SwipeableItem = ({ transaction, onConfirm, onUnconfirm, category }) => {
@@ -142,8 +143,8 @@ export default function CardPage() {
       toAssetId: creditAssetId,
       amount: confirmedSum,
       content: 'カード引き落とし精算',
-      date: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
+      date: getLocalDateString(),
+      createdAt: getLocalISOString()
     });
 
     const confirmedTxs = unconfirmedAndConfirmed.filter(t => t.cardStatus === 'confirmed');

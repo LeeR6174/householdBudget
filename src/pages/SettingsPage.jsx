@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2, Bell } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db, resetDB } from '../db/db';
-import { getCurrentBudgetMonth } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
 
 export default function SettingsPage() {
@@ -162,7 +162,7 @@ export default function SettingsPage() {
           content: contentRaw,
           memo: memoRaw,
           date: formattedDate,
-          createdAt: new Date().toISOString(),
+          createdAt: getLocalISOString(),
           cardStatus: 'unconfirmed'
         });
       }
@@ -206,7 +206,7 @@ export default function SettingsPage() {
 
       const backupData = {
         version: 2,
-        timestamp: new Date().toISOString(),
+        timestamp: getLocalISOString(),
         transactions,
         categories,
         assets,
@@ -220,7 +220,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `kakeibo_full_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `kakeibo_full_backup_${getLocalDateString()}.json`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -453,19 +453,19 @@ export default function SettingsPage() {
       </div>
 
       <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-        <h3 className="font-bold mb-md">アップデート内容 (V1.5.0.0)</h3>
+        <h3 className="font-bold mb-md">アップデート内容 (V1.5.1.0)</h3>
         <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
           <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            <li>新規取引の追加・編集画面から、その場でカテゴリを直接追加できるボタンを追加しました。</li>
-            <li>カテゴリの通常予算（積立額）を変更しても、過去の月の予算や積立額に影響しないよう歴史を保護する機能を実装しました。</li>
-            <li>システム全体の安定性向上と細かな不具合の修正。</li>
+            <li>【重要】朝の時間帯に記録すると日付が前日になってしまうタイムゾーンの不具合を修正しました。</li>
+            <li>ホーム画面のデータ読み込み処理を抜本的に見直し、動作速度とメモリ効率を大幅に改善しました（データ量増加時の重さを解消）。</li>
+            <li>ホーム画面の内部プログラムを整理し、将来の機能追加に向けた保守性を向上させました。</li>
           </ul>
         </div>
       </div>
 
       <div className="text-center mt-xl mb-lg opacity-50">
         <div className="text-xs font-bold">格が違う家計簿</div>
-        <div className="text-[10px]">Version 1.5.0.0</div>
+        <div className="text-[10px]">Version 1.5.1.0</div>
       </div>
     </div>
   );

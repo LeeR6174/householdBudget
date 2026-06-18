@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Plus, Minus, History } from 'lucide-react';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth, getNextMonth } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getNextMonth, getLocalDateString } from '../utils/dateUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
@@ -59,7 +59,7 @@ export default function SavingsPage() {
       amount: Number(amount),
       type,
       note: note.trim(),
-      date: new Date().toISOString().split('T')[0]
+      date: getLocalDateString()
     });
 
     setAmount('');

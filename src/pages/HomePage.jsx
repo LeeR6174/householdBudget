@@ -1,157 +1,44 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import TransactionItem from '../components/TransactionItem';
-import { calculateCarryoverBalance } from '../utils/budgetUtils';
+import { useDashboardStats } from '../hooks/useDashboardStats';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
   const { startDate, endDate } = getMonthRange(currentMonth);
 
-  // Queries
-  const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
-  const assets = useLiveQuery(() => db.assets.toArray()) || [];
-  const settings = useLiveQuery(() => db.settings.get('master'));
-  const monthlyBudgets = useLiveQuery(() => db.monthlyBudgets.where('month').equals(currentMonth).toArray(), [currentMonth]) || [];
-  const allMonthlyBudgets = useLiveQuery(() => db.monthlyBudgets.toArray()) || [];
-  const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonth), [currentMonth]);
-  const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
-  const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
+  const stats = useDashboardStats(currentMonth, startDate, endDate);
   
-  const currentMonthTx = useLiveQuery(() => {
-    return db.transactions
-      .where('date').between(startDate, endDate, true, true)
-      .toArray()
-      .then(items => items.sort((a, b) => {
-        if (a.date !== b.date) return b.date.localeCompare(a.date);
-        return (b.createdAt || '').localeCompare(a.createdAt || '');
-      }));
-  }, [startDate, endDate]) || [];
+  if (!stats) {
+    return (
+      <div className="page-container flex-center" style={{ minHeight: '100vh', paddingBottom: '100px' }}>
+        <div className="text-secondary font-bold">データを読み込み中...</div>
+      </div>
+    );
+  }
 
-  const allTx = useLiveQuery(() => db.transactions.toArray()) || [];
-
-  // --- 資産計算 ---
-  const assetBalances = {};
-  assets.forEach(a => assetBalances[a.id] = a.initialBalance || 0);
-
-  allTx.forEach(t => {
-    // --- 【残高計算】 ---
-    if (t.type === 'income') {
-      if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] += t.amount;
-    } else if (t.type === 'expense') {
-      if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
-    } else if (t.type === 'transfer') {
-      if (assetBalances[t.fromAssetId] !== undefined) assetBalances[t.fromAssetId] -= t.amount;
-      if (assetBalances[t.toAssetId] !== undefined) assetBalances[t.toAssetId] += t.amount;
-    }
-  });
-
-  // 手元実資産 (銀行＋現金の合計)
-  const bankBalance = assets
-    .filter(a => a.type === 'bank')
-    .reduce((sum, a) => sum + (assetBalances[a.id] || 0), 0);
-
-  const cashBalance = assets
-    .filter(a => a.type === 'cash')
-    .reduce((sum, a) => sum + (assetBalances[a.id] || 0), 0);
-
-  const realBalance = bankBalance + cashBalance;
-
-  // クレジットカード残高合計
-  const creditBalance = assets
-    .filter(a => a.type === 'credit')
-    .reduce((sum, a) => sum + (assetBalances[a.id] || 0), 0);
-
-  // 未払い総額 (マイナス残高の絶対値、UI表示用)
-  const unpaidTotal = creditBalance < 0 ? Math.abs(creditBalance) : 0;
-
-  // --- 貯金確保額の解決 ---
-  const initialSavings = settings?.targetSavings || 0;
-  const monthlyAdditions = allMonthlySettings
-    .filter(s => s.month <= currentMonth)
-    .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
-  
-  const totalDepletions = savingsRecords
-    .filter(r => r.type === 'depletion' && r.month <= currentMonth)
-    .reduce((sum, r) => sum + (r.amount || 0), 0);
-  
-  const extraAdditions = savingsRecords
-    .filter(r => r.type === 'addition' && r.month <= currentMonth)
-    .reduce((sum, r) => sum + (r.amount || 0), 0);
-
-  const totalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
-
-  // 本当の意味で使えるお金 (手元資金 + クレカ負債 - 貯金確保額)
-  const netWorth = realBalance + creditBalance - totalSavings;
-
-  // --- 今月の収支計算 (カード払いは利用月としてそのまま計上) ---
-  let income = 0;
-  let expense = 0;
-  const expenseByCategory = {};
-  
-  currentMonthTx.forEach(t => {
-    if (t.type === 'income') income += t.amount;
-    if (t.type === 'expense') {
-      expense += t.amount;
-      expenseByCategory[t.categoryId || 'uncategorized'] = (expenseByCategory[t.categoryId || 'uncategorized'] || 0) + t.amount;
-    }
-  });
-
-  // 予算合計の計算
-  const budgetMap = {};
-  monthlyBudgets.forEach(b => {
-    budgetMap[b.categoryId] = b.budget;
-  });
-  // カテゴリごとにデータを整理（計算高速化のため）
-  const txByCategory = {};
-  allTx.forEach(t => {
-    if (!txByCategory[t.categoryId]) txByCategory[t.categoryId] = [];
-    txByCategory[t.categoryId].push(t);
-  });
-  
-  const budgetsByCat = {};
-  allMonthlyBudgets.forEach(b => {
-    if (!budgetsByCat[b.categoryId]) budgetsByCat[b.categoryId] = [];
-    budgetsByCat[b.categoryId].push(b);
-  });
-
-  let totalBudget = 0;
-  let totalNormalBudget = 0;
-  let totalNormalExpense = 0;
-
-  categories.filter(c => c.type === 'expense').forEach(cat => {
-    const spent = expenseByCategory[cat.id] || 0;
-    const catTxs = txByCategory[cat.id] || [];
-    const catBudgets = budgetsByCat[cat.id] || [];
-
-    const limit = cat.isCarryover 
-      ? calculateCarryoverBalance(cat, currentMonth, catTxs, catBudgets) + spent
-      : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
-    
-    totalBudget += limit;
-
-    if (!cat.isCarryover) {
-      totalNormalBudget += limit;
-      totalNormalExpense += spent;
-    } else {
-      // 積立カテゴリの場合：当月の積立分（予算額）を「固定の支出」として計上する
-      const monthlyAddition = catBudgets.find(b => b.month === currentMonth)?.budget ?? (cat.monthlyLimit || 0);
-      totalNormalBudget += monthlyAddition;
-      totalNormalExpense += monthlyAddition;
-    }
-  });
-
-  // 未分類は通常支出に含める
-  totalNormalExpense += (expenseByCategory['uncategorized'] || 0);
-
-  const recentTransactions = currentMonthTx.slice(0, 5);
+  const {
+    assets,
+    categories,
+    realBalance,
+    bankBalance,
+    cashBalance,
+    unpaidTotal,
+    totalSavings,
+    netWorth,
+    income,
+    expense,
+    totalBudget,
+    recentTransactions,
+    categoryStats,
+    uncategorizedExpense
+  } = stats;
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
@@ -238,38 +125,28 @@ export default function HomePage() {
 
       <h3 className="font-bold mb-md mt-lg">当月のカテゴリ別予算・支出</h3>
       <div className="card">
-        {categories.filter(c => c.type === 'expense').map(cat => {
-          const spent = expenseByCategory[cat.id] || 0;
-          const catTxs = txByCategory[cat.id] || [];
-          const catBudgets = budgetsByCat[cat.id] || [];
-
-          const limit = cat.isCarryover 
-            ? calculateCarryoverBalance(cat, currentMonth, catTxs, catBudgets) + spent
-            : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
-            
-          return (
-            <BudgetProgressBar 
-              key={cat.id} 
-              category={cat} 
-              spent={expenseByCategory[cat.id] || 0} 
-              limit={limit}
-              isCarryover={cat.isCarryover}
-              onClick={() => navigate(`/settings/categories?edit=${cat.id}`)}
-            />
-          );
-        })}
+        {categoryStats.map(catStat => (
+          <BudgetProgressBar 
+            key={catStat.id} 
+            category={catStat} 
+            spent={catStat.spent} 
+            limit={catStat.limit}
+            isCarryover={catStat.isCarryover}
+            onClick={() => navigate(`/settings/categories?edit=${catStat.id}`)}
+          />
+        ))}
         
         {/* カテゴリ未設定の支出がある場合 */}
-        {expenseByCategory['uncategorized'] > 0 && (
+        {uncategorizedExpense > 0 && (
           <BudgetProgressBar 
             category={{ name: '未分類・不明', color: '#9ca3af', type: 'expense' }} 
-            spent={expenseByCategory['uncategorized']} 
+            spent={uncategorizedExpense} 
             limit={0}
             onClick={() => navigate('/settings/categories')}
           />
         )}
 
-        {categories.filter(c => c.type === 'expense').length === 0 && !expenseByCategory['uncategorized'] && (
+        {categoryStats.length === 0 && uncategorizedExpense === 0 && (
           <p className="text-secondary text-sm text-center">カテゴリがありません</p>
         )}
 
