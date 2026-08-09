@@ -419,8 +419,8 @@ input[type="datetime-local"].form-control {
 /* FAB */
 .fab {
   position: fixed;
-  bottom: 80px;
-  right: max(16px, calc(50vw - 224px)); /* Keep it inside the 480px max-width container */
+  bottom: 96px;
+  right: max(20px, calc(50vw - 220px)); /* Keep it inside the 480px max-width container with more padding */
   width: 56px;
   height: 56px;
   border-radius: 28px;
@@ -431,7 +431,7 @@ input[type="datetime-local"].form-control {
   justify-content: center;
   box-shadow: var(--shadow-lg);
   cursor: pointer;
-  z-index: 10;
+  z-index: 25; /* Float on top of bottom-nav (z-index 20) */
   border: none;
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
   user-select: none;
@@ -515,3 +515,39 @@ input[type="datetime-local"].form-control {
   background-color: rgba(255, 255, 255, 0.1);
   transform: scale(0.98);
 }
+
+/* 真ん中のホームボタンを際立たせるフローティングスタイル */
+.nav-item-home {
+  position: relative;
+  top: -16px; /* 少し上に浮かせる */
+  color: var(--text-secondary);
+}
+
+.home-icon-wrapper {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-color-light));
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+}
+
+.nav-item-home:active .home-icon-wrapper {
+  transform: scale(0.88);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.2);
+}
+
+.nav-item-home.active .home-icon-wrapper {
+  background: linear-gradient(135deg, #3730a3 0%, #4f46e5 100%);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.45);
+}
+
+.nav-item-home.active {
+  color: var(--primary-color) !important;
+  font-weight: 700;
+}
+

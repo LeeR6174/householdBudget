@@ -55,30 +55,32 @@ export default function AnalysisPage() {
     currentMonthTx.forEach(tx => {
       if (tx.type === 'income') income += tx.amount;
       if (tx.type === 'expense') {
-        expense += tx.amount;
-        
-        // カテゴリ別
-        catExpenses[tx.categoryId || 'uncategorized'] = (catExpenses[tx.categoryId || 'uncategorized'] || 0) + tx.amount;
-        
-        // 日別
-        const day = parseInt(tx.date.split('-')[2]);
-        dailyExpenses[day] = (dailyExpenses[day] || 0) + tx.amount;
+        if (!tx.isSavingsDepletion) {
+          expense += tx.amount;
+          
+          // カテゴリ別
+          catExpenses[tx.categoryId || 'uncategorized'] = (catExpenses[tx.categoryId || 'uncategorized'] || 0) + tx.amount;
+          
+          // 日別
+          const day = parseInt(tx.date.split('-')[2]);
+          dailyExpenses[day] = (dailyExpenses[day] || 0) + tx.amount;
 
-        // 支払い方法別
-        const asset = assets.find(a => a.id === tx.assetId);
-        if (asset) assetTypeExpenses[asset.type] += tx.amount;
+          // 支払い方法別
+          const asset = assets.find(a => a.id === tx.assetId);
+          if (asset) assetTypeExpenses[asset.type] += tx.amount;
 
-        // 固定費 vs 変動費
-        const cat = categories.find(c => c.id === tx.categoryId);
-        const isFixed = cat && (
-          subCategoryIds.includes(cat.id) ||
-          fixedKeywords.some(kw => cat.name.includes(kw))
-        );
-        
-        if (isFixed) {
-          fixedExpense += tx.amount;
-        } else {
-          variableExpense += tx.amount;
+          // 固定費 vs 変動費
+          const cat = categories.find(c => c.id === tx.categoryId);
+          const isFixed = cat && (
+            subCategoryIds.includes(cat.id) ||
+            fixedKeywords.some(kw => cat.name.includes(kw))
+          );
+          
+          if (isFixed) {
+            fixedExpense += tx.amount;
+          } else {
+            variableExpense += tx.amount;
+          }
         }
       }
     });
@@ -110,16 +112,18 @@ export default function AnalysisPage() {
     lastMonthTx.forEach(tx => {
       if (tx.type === 'income') income += tx.amount;
       if (tx.type === 'expense') {
-        expense += tx.amount;
-        
-        const cat = categories.find(c => c.id === tx.categoryId);
-        const isFixed = cat && (
-          subCategoryIds.includes(cat.id) ||
-          fixedKeywords.some(kw => cat.name.includes(kw))
-        );
-        
-        if (!isFixed) {
-          variableExpense += tx.amount;
+        if (!tx.isSavingsDepletion) {
+          expense += tx.amount;
+          
+          const cat = categories.find(c => c.id === tx.categoryId);
+          const isFixed = cat && (
+            subCategoryIds.includes(cat.id) ||
+            fixedKeywords.some(kw => cat.name.includes(kw))
+          );
+          
+          if (!isFixed) {
+            variableExpense += tx.amount;
+          }
         }
       }
     });
@@ -143,6 +147,7 @@ export default function AnalysisPage() {
       const pastTx = allRelevantTx.filter(tx => 
         tx.categoryId === cat.id && 
         tx.type === 'expense' && 
+        !tx.isSavingsDepletion && 
         pastMonths.some(m => tx.date.startsWith(m))
       );
       
@@ -214,7 +219,8 @@ export default function AnalysisPage() {
       const monthTx = allRelevantTx.filter(tx => 
         tx.date.startsWith(m) && 
         tx.categoryId === selectedCategoryId && 
-        tx.type === 'expense'
+        tx.type === 'expense' &&
+        !tx.isSavingsDepletion
       );
       const amount = monthTx.reduce((sum, t) => sum + t.amount, 0);
       return {
@@ -236,7 +242,7 @@ export default function AnalysisPage() {
     return months.map(m => {
       const monthTx = allRelevantTx.filter(tx => tx.date.startsWith(m));
       const inc = monthTx.filter(tx => tx.type === 'income').reduce((s, t) => s + t.amount, 0);
-      const exp = monthTx.filter(tx => tx.type === 'expense').reduce((s, t) => s + t.amount, 0);
+      const exp = monthTx.filter(tx => tx.type === 'expense' && !tx.isSavingsDepletion).reduce((s, t) => s + t.amount, 0);
       return { name: m.split('-')[1] + '月', income: inc, expense: exp };
     });
   }, [allRelevantTx, startDate]);

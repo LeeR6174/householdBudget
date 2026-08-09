@@ -50,19 +50,31 @@ export default function TransactionItem({ transaction, categories, assets, onCli
     <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
       <div className="flex items-center gap-md flex-1 min-w-0">
         <div 
-          className="category-block"
-          style={{ backgroundColor: `${category?.color || '#64748b'}`, color: '#fff' }}
+          className="category-block flex-center"
+          style={{ 
+            backgroundColor: transaction.isSavingsDepletion ? '#e0e7ff' : `${category?.color || '#64748b'}`, 
+            color: transaction.isSavingsDepletion ? '#4f46e5' : '#fff',
+            fontSize: transaction.isSavingsDepletion ? '18px' : 'inherit'
+          }}
         >
-          {category?.name?.slice(0, 4) || '?'}
+          {transaction.isSavingsDepletion ? '🐷' : (category?.name?.slice(0, 4) || '?')}
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="font-bold text-base truncate leading-tight mb-xs">
-            {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || '未設定'}
+            {transaction.content || (transaction.memo ? `メモ: ${transaction.memo}` : '') || (transaction.isSavingsDepletion ? '貯金切り崩し' : '未設定')}
           </div>
-          <div className="flex items-center gap-sm">
+          <div className="flex items-center gap-sm flex-wrap">
             <span className="text-xs text-secondary truncate" style={{ opacity: 0.7 }}>
               {asset?.name || '不明'}
             </span>
+            {transaction.isSavingsDepletion && (
+              <span 
+                className="text-[9px] font-bold px-sm py-xs rounded" 
+                style={{ backgroundColor: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-color)', lineHeight: 1 }}
+              >
+                貯金切崩し
+              </span>
+            )}
             <span className="text-xs text-secondary ml-auto" style={{ opacity: 0.6 }}>
               {formatDate(transaction.date)}
             </span>

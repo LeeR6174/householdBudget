@@ -1,116 +1,180 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Plus, Minus, History, Link2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Plus, History, AlertCircle } from 'lucide-react';
+import { 
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip 
+} from 'recharts';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth, getNextMonth, getLocalDateString } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getLocalDateString } from '../utils/dateUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
   const currentMonthStr = getCurrentBudgetMonth();
   
   const settings = useLiveQuery(() => db.settings.get('master'));
-  const monthlySettings = useLiveQuery(() => db.monthlySettings.get(currentMonthStr), [currentMonthStr]);
-  const nextMonthStr = getNextMonth(currentMonthStr);
-  const nextMonthlySettings = useLiveQuery(() => db.monthlySettings.get(nextMonthStr), [nextMonthStr]);
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
   const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
   
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [type, setType] = useState('depletion'); // depletion (切り崩し) or addition (追加)
-  
-  // 取引連動関連のState
-  const [autoLink, setAutoLink] = useState(false);
-  const [fromAssetId, setFromAssetId] = useState('');
-  const [toAssetId, setToAssetId] = useState('');
 
-  // アセット読み込み時に初期値をセット
-  useEffect(() => {
-    if (assets.length > 0) {
-      if (!fromAssetId) setFromAssetId(assets[0].id);
-      if (!toAssetId) setToAssetId(assets.length > 1 ? assets[1].id : assets[0].id);
-    }
-  }, [assets]);
-
+  // 1. 今月の貯金総額等の集計
   const initialSavings = settings?.targetSavings || 0;
   const monthlyAdditions = allMonthlySettings
     .filter(s => s.month <= currentMonthStr)
     .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
-  const totalDepletions = savingsRecords
-    .filter(r => r.type === 'depletion' && r.month <= currentMonthStr)
-    .reduce((sum, r) => sum + (r.amount || 0), 0);
+  
+  const totalDepletions = useMemo(() => {
+    const dbDepletions = savingsRecords
+      .filter(r => r.type === 'depletion' && r.month <= currentMonthStr)
+      .reduce((sum, r) => sum + (r.amount || 0), 0);
+    const txDepletions = transactions
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) <= currentMonthStr)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    return dbDepletions + txDepletions;
+  }, [savingsRecords, transactions, currentMonthStr]);
+
   const extraAdditions = savingsRecords
     .filter(r => r.type === 'addition' && r.month <= currentMonthStr)
     .reduce((sum, r) => sum + (r.amount || 0), 0);
 
   const currentTotalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
 
-  const handleUpdateMonthlySavings = async (value) => {
-    const amount = Number(value) || 0;
-    await db.monthlySettings.put({ month: currentMonthStr, targetSavings: amount });
-    
-    // 来月の設定がまだない場合、当月の設定を反映する
-    const nextSettings = await db.monthlySettings.get(nextMonthStr);
-    if (!nextSettings) {
-      await db.monthlySettings.put({ month: nextMonthStr, targetSavings: amount });
-    }
-  };
+  // 2. 過去6ヶ月の月末時点での貯金総額の推移データ作成
+  const savingsTrendData = useMemo(() => {
+    if (!settings || allMonthlySettings.length === 0) return [];
 
-  const handleUpdateNextMonthlySavings = async (value) => {
-    const amount = Number(value) || 0;
-    await db.monthlySettings.put({ month: nextMonthStr, targetSavings: amount });
-  };
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      months.push(getLocalDateString(d).slice(0, 7)); // "YYYY-MM"
+    }
+
+    return months.map(m => {
+      const monthlyAdditionsLimit = allMonthlySettings
+        .filter(s => s.month <= m)
+        .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
+
+      const dbExtraAdditions = savingsRecords
+        .filter(r => r.type === 'addition' && r.month <= m)
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      const dbDepletions = savingsRecords
+        .filter(r => r.type === 'depletion' && r.month <= m)
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      const txDepletions = transactions
+        .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) <= m)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+      const balance = initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions);
+
+      return {
+        name: m.split('-')[1] + '月',
+        貯金残高: balance
+      };
+    });
+  }, [settings, allMonthlySettings, savingsRecords, transactions, initialSavings]);
+
+  // 3. 今月の貯金からの支出 (切り崩し)
+  const currentMonthDepletionTx = useMemo(() => {
+    return transactions.filter(t => 
+      t.type === 'expense' && 
+      t.isSavingsDepletion && 
+      t.date.substring(0, 7) === currentMonthStr
+    );
+  }, [transactions, currentMonthStr]);
+
+  // 4. 全期間の貯蓄・切り崩し履歴（手動レコード＋新方式の支出連動）をマージ
+  const allSavingsHistory = useMemo(() => {
+    const records = savingsRecords.map(r => ({
+      id: `record_${r.id}`,
+      originalId: r.id,
+      isTx: false,
+      date: r.date,
+      month: r.month,
+      type: r.type,
+      amount: r.amount,
+      note: r.note || (r.type === 'depletion' ? '手動切り崩し' : '臨時貯蓄追加'),
+      raw: r
+    }));
+
+    const txs = transactions
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion)
+      .map(t => ({
+        id: `tx_${t.id}`,
+        originalId: t.id,
+        isTx: true,
+        date: t.date,
+        month: t.date.substring(0, 7),
+        type: 'depletion',
+        amount: t.amount,
+        note: t.content || '貯金切り崩し支出',
+        raw: t
+      }));
+
+    return [...records, ...txs].sort((a, b) => b.date.localeCompare(a.date));
+  }, [savingsRecords, transactions]);
 
   const handleAddRecord = async (e) => {
     e.preventDefault();
     if (!amount || Number(amount) <= 0) return;
 
-    let transactionId = null;
     const recordAmount = Number(amount);
-
-    // 取引履歴との自動連動処理
-    if (autoLink && fromAssetId && toAssetId) {
-      transactionId = crypto.randomUUID();
-      const content = type === 'depletion' ? `貯金切り崩し (${note.trim() || '振替'})` : `貯蓄臨時追加 (${note.trim() || '振替'})`;
-      
-      await db.transactions.add({
-        id: transactionId,
-        type: 'transfer',
-        fromAssetId: fromAssetId,
-        toAssetId: toAssetId,
-        amount: recordAmount,
-        content: content,
-        memo: note.trim() || (type === 'depletion' ? '貯金切り崩し' : '貯蓄追加'),
-        date: getLocalDateString(),
-        createdAt: new Date().toISOString()
-      });
-    }
 
     await db.savingsRecords.add({
       month: currentMonthStr,
       amount: recordAmount,
-      type,
+      type: 'addition', // フォームからは「臨時追加」のみ可能
       note: note.trim(),
-      date: getLocalDateString(),
-      transactionId // 連動した取引IDを保持
+      date: getLocalDateString()
     });
 
     setAmount('');
     setNote('');
-    setAutoLink(false);
   };
 
-  const handleDeleteRecord = async (record) => {
+  const handleDeleteRecord = async (item) => {
     if (window.confirm('この記録を削除しますか？')) {
-      if (record.transactionId) {
-        // 連動して登録された取引も自動削除する
-        await db.transactions.delete(record.transactionId);
+      if (item.isTx) {
+        // 支出連動トランザクションの削除
+        await db.transactions.delete(item.originalId);
+      } else {
+        // 手動レコードの削除
+        if (item.raw.transactionId) {
+          await db.transactions.delete(item.raw.transactionId);
+        }
+        await db.savingsRecords.delete(item.originalId);
       }
-      await db.savingsRecords.delete(record.id);
     }
+  };
+
+  // プレミアムなツールチップ
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          boxShadow: 'var(--shadow-md)'
+        }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>{label}時点</p>
+          <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary-color)' }}>
+            貯金総額: {formatCurrency(payload[0].value)}
+          </p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -120,18 +184,18 @@ export default function SavingsPage() {
           <ChevronLeft size={24} />
           <span>戻る</span>
         </button>
-        <div className="page-title" style={{ marginBottom: 0 }}>貯金・切り崩し管理</div>
+        <div className="page-title" style={{ marginBottom: 0 }}>貯金ダッシュボード</div>
       </div>
 
       {/* 👑 貯金総額 & グラフィカルな内訳グリッド */}
       <div className="card mb-lg" style={{ 
-        background: 'linear-gradient(135deg, #064e3b 0%, #059669 100%)', 
+        background: 'linear-gradient(135deg, #312e81 0%, #4f46e5 100%)', 
         color: 'white', 
         padding: '24px', 
         borderRadius: '24px',
-        boxShadow: '0 10px 15px -3px rgba(6, 78, 59, 0.2), 0 4px 6px -4px rgba(6, 78, 59, 0.1)'
+        boxShadow: '0 12px 20px -4px rgba(79, 70, 229, 0.25)'
       }}>
-        <div className="text-sm opacity-80 mb-xs">現在の仮想貯金総額</div>
+        <div className="text-sm opacity-80 mb-xs">現在の貯蓄総額 (キープ分)</div>
         <div className="text-4xl font-black mb-lg" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
           {formatCurrency(currentTotalSavings)}
         </div>
@@ -151,188 +215,139 @@ export default function SavingsPage() {
           </div>
           <div style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '10px 12px', borderRadius: '12px' }}>
             <div className="text-[10px] opacity-70 mb-xs">切り崩し累計</div>
-            <div className="font-bold text-sm" style={{ color: '#fecaca' }}>-{formatCurrency(totalDepletions)}</div>
+            <div className="font-bold text-sm" style={{ color: '#fca5a5' }}>-{formatCurrency(totalDepletions)}</div>
           </div>
         </div>
       </div>
 
-      <div className="card mb-lg" style={{ border: '2px solid var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.02)' }}>
-        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)' }}>🐷 {currentMonthStr} の積立額</h3>
-        <p className="text-xs text-secondary mb-md">
-          今月追加で貯金に回す額を設定します。
-        </p>
-        <div className="flex-center gap-md">
-          <input 
-            type="number" 
-            inputMode="numeric" 
-            className="form-control" 
-            value={monthlySettings?.targetSavings ?? ''} 
-            onChange={(e) => handleUpdateMonthlySavings(e.target.value)}
-            placeholder="0"
-            style={{ fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'right' }}
-          />
-          <span className="font-bold text-sm">円</span>
+      {/* 📈 貯蓄推移グラフ */}
+      {savingsTrendData.length > 0 && (
+        <div className="card mb-lg" style={{ padding: '20px' }}>
+          <h3 className="font-bold text-sm mb-md text-primary flex items-center gap-xs" style={{ margin: '0 0 16px 0' }}>
+            📈 過去6ヶ月の貯金推移
+          </h3>
+          <div style={{ width: '100%', height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={savingsTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary-color)" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="var(--primary-color)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} style={{ fontSize: '10px', fill: 'var(--text-secondary)' }} />
+                <YAxis tickLine={false} axisLine={false} style={{ fontSize: '10px', fill: 'var(--text-secondary)' }} tickFormatter={(v) => `${v / 1000}k`} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="貯金残高" stroke="var(--primary-color)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSavings)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="card mb-lg" style={{ border: '1px dashed var(--primary-color-light)', backgroundColor: 'rgba(79, 70, 229, 0.01)' }}>
-        <h3 className="font-bold mb-sm" style={{ color: 'var(--primary-color)', opacity: 0.8 }}>📅 {nextMonthStr} の積立額 (予定)</h3>
-        <p className="text-xs text-secondary mb-md">
-          来月の積立予定額を設定します。
-        </p>
-        <div className="flex-center gap-md">
-          <input 
-            type="number" 
-            inputMode="numeric" 
-            className="form-control" 
-            value={nextMonthlySettings?.targetSavings ?? ''} 
-            onChange={(e) => handleUpdateNextMonthlySavings(e.target.value)}
-            placeholder="0"
-            style={{ fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'right', opacity: 0.8 }}
-          />
-          <span className="font-bold text-sm" style={{ opacity: 0.8 }}>円</span>
+      {/* 🐷 今月の貯金からの支出（切り崩し） */}
+      {currentMonthDepletionTx.length > 0 && (
+        <div className="card mb-lg" style={{ padding: '20px' }}>
+          <h3 className="font-bold text-sm mb-md text-primary flex items-center gap-xs" style={{ margin: '0 0 12px 0' }}>
+            🐷 今月の貯金からの支払い
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {currentMonthDepletionTx.map(tx => {
+              const asset = assets.find(a => a.id === tx.assetId);
+              return (
+                <div key={tx.id} className="list-item" style={{ padding: '12px 0' }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                      {tx.content || '名称未設定'}
+                    </div>
+                    <div className="text-[10px] text-secondary flex gap-sm mt-xs" style={{ opacity: 0.7 }}>
+                      <span>{asset?.name || '不明'}</span>
+                      <span>{tx.date}</span>
+                    </div>
+                  </div>
+                  <div className="font-bold text-base text-expense" style={{ marginLeft: '12px', flexShrink: 0 }}>
+                    -{formatCurrency(tx.amount)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 貯金の切り崩し・追加フォーム */}
+      {/* 💰 臨時貯蓄追加フォーム */}
       <div className="card mb-lg">
-        <h3 className="font-bold mb-md">貯金の切り崩し・追加記録</h3>
+        <h3 className="font-bold mb-md" style={{ margin: '0 0 16px 0' }}>臨時貯金（追加）の記録</h3>
         <form onSubmit={handleAddRecord}>
-          <div className="flex gap-sm mb-md">
-            <button 
-              type="button" 
-              className={`flex-1 btn ${type === 'depletion' ? 'btn-danger' : 'btn-outline'}`}
-              onClick={() => setType('depletion')}
-              style={{ fontSize: '0.8rem' }}
-            >
-              <Minus size={14} className="mr-xs" /> 切り崩し
-            </button>
-            <button 
-              type="button" 
-              className={`flex-1 btn ${type === 'addition' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setType('addition')}
-              style={{ fontSize: '0.8rem' }}
-            >
-              <Plus size={14} className="mr-xs" /> 臨時追加
-            </button>
-          </div>
-
-          <div className="form-group mb-md">
-            <label className="form-label">金額 (円)</label>
+          <div className="form-group">
+            <label className="form-label">追加する金額 (円)</label>
             <input 
               type="number" 
               inputMode="numeric" 
-              className="form-control" 
-              value={amount} 
-              onChange={e => setAmount(e.target.value)} 
-              placeholder="0" 
+              pattern="[0-9]*"
+              className="form-control text-primary font-bold" 
+              placeholder="例: 10000"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              required
+              min="1"
             />
           </div>
-
-          <div className="form-group mb-md">
-            <label className="form-label">メモ (理由など)</label>
+          <div className="form-group mb-lg">
+            <label className="form-label">メモ・用途 (任意)</label>
             <input 
               type="text" 
               className="form-control" 
-              value={note} 
-              onChange={e => setNote(e.target.value)} 
-              placeholder="例: 車検費用, 臨時ボーナスなど" 
+              placeholder="例: ボーナスから貯蓄用へ"
+              value={note}
+              onChange={e => setNote(e.target.value)}
             />
           </div>
 
-          {/* 取引連動機能 */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px' }}>
-            <label className="flex items-center gap-sm cursor-pointer mb-md" style={{ userSelect: 'none' }}>
-              <input 
-                type="checkbox" 
-                checked={autoLink}
-                onChange={(e) => setAutoLink(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <span className="text-xs font-bold flex items-center gap-xs text-secondary">
-                <Link2 size={14} /> 家計簿の取引履歴に自動反映する
-              </span>
-            </label>
-
-            {autoLink && (
-              <div className="animate-fade-in" style={{ backgroundColor: 'rgba(79, 70, 229, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(79, 70, 229, 0.08)', marginBottom: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group mb-0">
-                    <label className="form-label text-[10px]">
-                      {type === 'depletion' ? '振替元 (貯蓄元)' : '振替元 (生活費口座)'}
-                    </label>
-                    <select 
-                      className="form-control" 
-                      style={{ padding: '8px 12px', fontSize: '13px' }}
-                      value={fromAssetId}
-                      onChange={(e) => setFromAssetId(e.target.value)}
-                    >
-                      {assets.map(a => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group mb-0">
-                    <label className="form-label text-[10px]">
-                      {type === 'depletion' ? '振替先 (受取口座)' : '振替先 (貯蓄先)'}
-                    </label>
-                    <select 
-                      className="form-control" 
-                      style={{ padding: '8px 12px', fontSize: '13px' }}
-                      value={toAssetId}
-                      onChange={(e) => setToAssetId(e.target.value)}
-                    >
-                      {assets.map(a => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="text-[10px] text-secondary mt-sm flex items-start gap-xs" style={{ opacity: 0.8 }}>
-                  <AlertCircle size={12} style={{ marginTop: '1px', flexShrink: 0 }} />
-                  <span>指定口座間で振替取引が自動作成されます。この貯蓄記録を削除すると、紐づく振替取引も自動で削除されます。</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button type="submit" className="btn btn-primary w-full font-bold">
-            記録する
+          <button type="submit" className="btn btn-primary w-full flex-center gap-xs" style={{ height: '46px', fontSize: '1rem' }}>
+            <Plus size={18} />
+            <span>貯蓄を臨時追加する</span>
           </button>
         </form>
       </div>
 
-      <h3 className="font-bold mb-md flex items-center gap-sm">
-        <History size={18} />
-        履歴
-      </h3>
-      {savingsRecords.length === 0 ? (
-        <div className="text-center p-xl text-secondary">記録がありません</div>
-      ) : (
-        <div className="card">
-          {[...savingsRecords].reverse().map(record => (
-            <div key={record.id} className="flex-between py-md" style={{ borderBottom: '1px solid var(--border-color)' }}>
-              <div>
-                <div className="text-xs text-secondary flex items-center gap-xs">
-                  <span>{record.month} / {record.date}</span>
-                  {record.transactionId && (
-                    <span className="flex items-center text-[9px] bg-slate-100 text-secondary px-xs py-2xs rounded-sm font-bold border border-slate-200">
-                      <Link2 size={8} className="mr-3xs" /> 連動済
-                    </span>
-                  )}
-                </div>
-                <div className="font-bold">{record.note || (record.type === 'depletion' ? '切り崩し' : '追加')}</div>
+      {/* ⏳ 貯蓄・切り崩し履歴 (手動履歴と新方式の支出連動履歴を時系列マージ) */}
+      <div className="card">
+        <h3 className="font-bold mb-md text-secondary flex items-center gap-xs" style={{ margin: '0 0 12px 0' }}>
+          <History size={16} /> 貯金・切り崩し履歴
+        </h3>
+        {allSavingsHistory.map(item => (
+          <div key={item.id} className="list-item" style={{ padding: '12px 0' }}>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-sm flex items-center gap-xs" style={{ color: 'var(--text-primary)' }}>
+                {item.isTx && <span style={{ fontSize: '12px' }}>🐷</span>}
+                <span className="truncate">{item.note}</span>
               </div>
-              <div className="text-right">
-                <div className={`font-bold ${record.type === 'depletion' ? 'text-expense' : 'text-income'}`}>
-                  {record.type === 'depletion' ? '-' : '+'}{formatCurrency(record.amount)}
-                </div>
-                <button className="text-xs text-danger-color mt-xs" onClick={() => handleDeleteRecord(record)} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>削除</button>
+              <div className="text-[10px] text-secondary mt-xs" style={{ opacity: 0.7 }}>
+                {item.date} ({item.month}){item.isTx && ' [支出連動]'}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="flex items-center gap-md">
+              <span className={`font-bold text-base ${item.type === 'depletion' ? 'text-expense' : 'text-income'}`}>
+                {item.type === 'depletion' ? '-' : '+'}{formatCurrency(item.amount)}
+              </span>
+              <button 
+                className="btn-icon text-secondary" 
+                style={{ padding: '4px' }}
+                onClick={() => handleDeleteRecord(item)}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+        {allSavingsHistory.length === 0 && (
+          <div className="text-center py-lg text-secondary text-sm">
+            履歴はありません
+          </div>
+        )}
+      </div>
     </div>
   );
 }

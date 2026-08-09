@@ -14,6 +14,7 @@ export default function CategoriesPage() {
   const [searchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   
   // Form state
   const [name, setName] = useState('');
@@ -63,6 +64,7 @@ export default function CategoriesPage() {
     setIsCarryover(false);
     setDescription('');
     setIsEditing(false);
+    setShowModal(false);
     setSearchParams({}, { replace: true });
   };
 
@@ -75,10 +77,7 @@ export default function CategoriesPage() {
     setIsCarryover(cat.isCarryover || false);
     setDescription(cat.description || '');
     setIsEditing(true);
-    
-    // Smooth scroll to top/form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    formRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowModal(true);
   };
 
   const handleDelete = async (id) => {
@@ -229,132 +228,185 @@ export default function CategoriesPage() {
         <div className="page-title" style={{ marginBottom: 0 }}>カテゴリ管理</div>
       </div>
 
-      {isEditing && (
-        <div className="card" style={{ 
-          backgroundColor: 'var(--primary-color)', 
-          color: 'white', 
-          padding: '12px', 
-          textAlign: 'center', 
-          marginBottom: '16px',
-          fontWeight: 'bold',
-          borderRadius: '12px',
-          animation: 'pulse 2s infinite'
-        }}>
-          💡 カテゴリ編集モード：上のフォームの内容を修正してください
+      {/* ＋ 新規カテゴリを追加ボタン */}
+      <div className="mb-lg">
+        <button 
+          className="btn btn-primary w-full flex-center gap-xs" 
+          style={{ 
+            height: '48px', 
+            fontSize: '1.05rem', 
+            background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-light) 100%)', 
+            borderRadius: '16px', 
+            boxShadow: 'var(--shadow-md)' 
+          }}
+          onClick={() => {
+            resetForm();
+            setShowModal(true);
+          }}
+        >
+          <Plus size={20} />
+          <span>新規カテゴリを追加</span>
+        </button>
+      </div>
+
+      {/* フォーム入力モーダル */}
+      {showModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+            animation: 'fadeIn 0.25s ease-out'
+          }} 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) resetForm();
+          }}
+        >
+          <div 
+            className="card animate-scale-in" 
+            style={{ 
+              width: '100%', 
+              maxWidth: '440px', 
+              margin: 0, 
+              zIndex: 1001, 
+              maxHeight: '90vh', 
+              overflowY: 'auto',
+              borderRadius: '24px',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid rgba(255,255,255,0.8)'
+            }} 
+            ref={formRef}
+          >
+            <div className="flex-between mb-md">
+              <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)', marginBottom: 0 }}>
+                {isEditing ? 'カテゴリの編集' : '新規カテゴリの追加'}
+              </h3>
+              <button 
+                type="button" 
+                className="btn btn-outline flex-center" 
+                style={{ width: '32px', height: '32px', borderRadius: '16px', padding: 0, fontSize: '1.2rem', color: 'var(--text-secondary)' }}
+                onClick={resetForm}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSave}>
+              <div className="form-group">
+                <label className="form-label">カテゴリ名</label>
+                <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} required placeholder="例: 交際費" />
+              </div>
+              
+              <div className="flex gap-md mb-md">
+                <div className="flex-1">
+                  <label className="form-label">収支タイプ</label>
+                  <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
+                    <option value="expense">支出</option>
+                    <option value="income">収入</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="form-label">カラー</label>
+                  <input type="color" className="form-control" style={{ padding: '4px', height: '46px' }} value={color} onChange={e => setColor(e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="form-group mb-md">
+                <label className="form-label">説明 (任意)</label>
+                <textarea 
+                  className="form-control" 
+                  value={description} 
+                  onChange={e => setDescription(e.target.value)} 
+                  placeholder="カテゴリの詳細やメモを入力" 
+                  rows="2"
+                  style={{ resize: 'none' }}
+                />
+              </div>
+
+              {type === 'expense' && (
+                <>
+                  <div className="form-group mb-md">
+                    <label className="form-label">基本の月額予算 (円)</label>
+                    <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
+                  </div>
+
+                  <div 
+                    className="form-group flex-between mb-md p-md" 
+                    style={{ 
+                      backgroundColor: isCarryover ? 'rgba(79, 70, 229, 0.1)' : 'rgba(0,0,0,0.03)', 
+                      borderRadius: '16px', 
+                      cursor: 'pointer',
+                      border: isCarryover ? '1px solid var(--primary-color-light)' : '1px solid transparent',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }} 
+                    onClick={() => setIsCarryover(!isCarryover)}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: '700', color: isCarryover ? 'var(--primary-color)' : 'var(--text-primary)' }}>
+                        予算を翌月に繰り越す（積立型）
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        使わなかった分が翌月に加算されます
+                      </div>
+                    </div>
+                    <div style={{ 
+                      width: '44px', 
+                      height: '24px', 
+                      backgroundColor: isCarryover ? 'var(--primary-color)' : '#cbd5e1', 
+                      borderRadius: '12px', 
+                      position: 'relative',
+                      transition: 'background-color 0.2s',
+                      flexShrink: 0
+                    }}>
+                      <div style={{ 
+                        width: '18px', 
+                        height: '18px', 
+                        backgroundColor: 'white', 
+                        borderRadius: '50%', 
+                        position: 'absolute', 
+                        top: '3px', 
+                        left: isCarryover ? '23px' : '3px',
+                        transition: 'left 0.2s'
+                      }}></div>
+                    </div>
+                  </div>
+
+                  <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                    <label className="form-label" style={{ color: 'var(--primary-color)' }}>
+                      ✨ {currentMonthStr} {isCarryover ? '限定の積立額' : '限定の予算'} (任意)
+                    </label>
+                    <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder={isCarryover ? "今月だけ積立額を変える場合" : "今月だけ予算を変える場合"} style={{ borderColor: 'var(--primary-color-light)' }} />
+                    <p className="text-xs text-secondary mt-xs">
+                      {isCarryover 
+                        ? "※未入力の場合は基本の積立額が適用されます。0を入力すると今月は積み立てません。" 
+                        : "※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。"}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-sm">
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                  {isEditing ? '更新する' : '追加する'}
+                </button>
+                <button type="button" className="btn btn-outline" onClick={resetForm}>
+                  キャンセル
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
-
-      <div className="card mb-lg" ref={formRef}>
-        <h3 className="font-bold mb-md">{isEditing ? 'カテゴリの編集' : '新規カテゴリの追加'}</h3>
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label className="form-label">カテゴリ名</label>
-            <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} required placeholder="例: 交際費" />
-          </div>
-          
-          <div className="flex gap-md mb-md">
-            <div className="flex-1">
-              <label className="form-label">収支タイプ</label>
-              <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
-                <option value="expense">支出</option>
-                <option value="income">収入</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="form-label">カラー</label>
-              <input type="color" className="form-control" style={{ padding: '4px', height: '46px' }} value={color} onChange={e => setColor(e.target.value)} />
-            </div>
-          </div>
-          
-          <div className="form-group mb-md">
-            <label className="form-label">説明 (任意)</label>
-            <textarea 
-              className="form-control" 
-              value={description} 
-              onChange={e => setDescription(e.target.value)} 
-              placeholder="カテゴリの詳細やメモを入力" 
-              rows="2"
-              style={{ resize: 'none' }}
-            />
-          </div>
-
-          {type === 'expense' && (
-            <>
-              <div className="form-group mb-md">
-                <label className="form-label">基本の月額予算 (円)</label>
-                <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
-              </div>
-
-              <div 
-                className="form-group flex-between mb-md p-md" 
-                style={{ 
-                  backgroundColor: isCarryover ? 'rgba(79, 70, 229, 0.1)' : 'rgba(0,0,0,0.03)', 
-                  borderRadius: '16px', 
-                  cursor: 'pointer',
-                  border: isCarryover ? '1px solid var(--primary-color-light)' : '1px solid transparent',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }} 
-                onClick={() => setIsCarryover(!isCarryover)}
-              >
-                <div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: '700', color: isCarryover ? 'var(--primary-color)' : 'var(--text-primary)' }}>
-                    予算を翌月に繰り越す（積立型）
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                    使わなかった分が翌月に加算されます
-                  </div>
-                </div>
-                <div style={{ 
-                  width: '44px', 
-                  height: '24px', 
-                  backgroundColor: isCarryover ? 'var(--primary-color)' : '#cbd5e1', 
-                  borderRadius: '12px', 
-                  position: 'relative',
-                  transition: 'background-color 0.2s',
-                  flexShrink: 0
-                }}>
-                  <div style={{ 
-                    width: '18px', 
-                    height: '18px', 
-                    backgroundColor: 'white', 
-                    borderRadius: '50%', 
-                    position: 'absolute', 
-                    top: '3px', 
-                    left: isCarryover ? '23px' : '3px',
-                    transition: 'left 0.2s'
-                  }}></div>
-                </div>
-              </div>
-
-              <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                <label className="form-label" style={{ color: 'var(--primary-color)' }}>
-                  ✨ {currentMonthStr} {isCarryover ? '限定の積立額' : '限定の予算'} (任意)
-                </label>
-                <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder={isCarryover ? "今月だけ積立額を変える場合" : "今月だけ予算を変える場合"} style={{ borderColor: 'var(--primary-color-light)' }} />
-                <p className="text-xs text-secondary mt-xs">
-                  {isCarryover 
-                    ? "※未入力の場合は基本の積立額が適用されます。0を入力すると今月は積み立てません。" 
-                    : "※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。"}
-                </p>
-              </div>
-            </>
-          )}
-
-          <div className="flex gap-sm">
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-              {isEditing ? '更新する' : '追加する'}
-            </button>
-            {isEditing && (
-              <button type="button" className="btn btn-outline" onClick={resetForm}>
-                キャンセル
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
 
       <div className="card">
         <CategoryList cats={expenseCats} title="支出カテゴリー" />
