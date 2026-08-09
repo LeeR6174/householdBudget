@@ -44,7 +44,8 @@ const DEFAULT_ASSETS = [
 const DEFAULT_SETTINGS = {
   id: 'master',
   currency: 'JPY',
-  targetSavings: 0
+  targetSavings: 0,
+  lastReconciliationDate: ''
 };
 
 export const initDB = async () => {

@@ -62,7 +62,15 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       .reduce((sum, r) => sum + (r.amount || 0), 0);
 
     const totalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
-    const netWorth = realBalance + creditBalance - totalSavings;
+
+    // 当月の動きの計算
+    const currentMonthTargetSavings = allMonthlySettings.find(s => s.month === currentMonth)?.targetSavings || 0;
+    const currentMonthDepletions = savingsRecords
+      .filter(r => r.type === 'depletion' && r.month === currentMonth)
+      .reduce((sum, r) => sum + (r.amount || 0), 0);
+    const currentMonthExtraAdditions = savingsRecords
+      .filter(r => r.type === 'addition' && r.month === currentMonth)
+      .reduce((sum, r) => sum + (r.amount || 0), 0);
 
     // 4. 今月の収支計算
     let income = 0;
@@ -128,16 +136,32 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     const recentTransactions = currentMonthTx.slice(0, 5);
     const uncategorizedExpense = expenseByCategory['uncategorized'] || 0;
 
+    // 残り予算の計算
+    const remainingBudget = Math.max(0, totalBudget - expense);
+
+    // 実質残高（使えるお金）の計算
+    const netWorth = realBalance + creditBalance - totalSavings - remainingBudget;
+
+    // アセットに現在の計算残高をマッピング
+    const assetsWithBalances = assets.map(a => ({
+      ...a,
+      balance: assetBalances[a.id] || 0
+    }));
+
     // Return aggregated results without holding allTx
     return {
       isLoaded: true,
-      assets,
+      assets: assetsWithBalances,
       categories,
       realBalance,
       bankBalance,
       cashBalance,
       unpaidTotal,
       totalSavings,
+      currentMonthTargetSavings,
+      currentMonthDepletions,
+      currentMonthExtraAdditions,
+      remainingBudget,
       netWorth,
       income,
       expense,

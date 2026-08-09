@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Plus, Minus, History } from 'lucide-react';
+import { ChevronLeft, Plus, Minus, History, Link2, AlertCircle } from 'lucide-react';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getNextMonth, getLocalDateString } from '../utils/dateUtils';
@@ -16,10 +16,24 @@ export default function SavingsPage() {
   const nextMonthlySettings = useLiveQuery(() => db.monthlySettings.get(nextMonthStr), [nextMonthStr]);
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
   const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
+  const assets = useLiveQuery(() => db.assets.toArray()) || [];
   
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [type, setType] = useState('depletion'); // depletion (切り崩し) or addition (追加)
+  
+  // 取引連動関連のState
+  const [autoLink, setAutoLink] = useState(false);
+  const [fromAssetId, setFromAssetId] = useState('');
+  const [toAssetId, setToAssetId] = useState('');
+
+  // アセット読み込み時に初期値をセット
+  useEffect(() => {
+    if (assets.length > 0) {
+      if (!fromAssetId) setFromAssetId(assets[0].id);
+      if (!toAssetId) setToAssetId(assets.length > 1 ? assets[1].id : assets[0].id);
+    }
+  }, [assets]);
 
   const initialSavings = settings?.targetSavings || 0;
   const monthlyAdditions = allMonthlySettings
@@ -54,21 +68,48 @@ export default function SavingsPage() {
     e.preventDefault();
     if (!amount || Number(amount) <= 0) return;
 
+    let transactionId = null;
+    const recordAmount = Number(amount);
+
+    // 取引履歴との自動連動処理
+    if (autoLink && fromAssetId && toAssetId) {
+      transactionId = crypto.randomUUID();
+      const content = type === 'depletion' ? `貯金切り崩し (${note.trim() || '振替'})` : `貯蓄臨時追加 (${note.trim() || '振替'})`;
+      
+      await db.transactions.add({
+        id: transactionId,
+        type: 'transfer',
+        fromAssetId: fromAssetId,
+        toAssetId: toAssetId,
+        amount: recordAmount,
+        content: content,
+        memo: note.trim() || (type === 'depletion' ? '貯金切り崩し' : '貯蓄追加'),
+        date: getLocalDateString(),
+        createdAt: new Date().toISOString()
+      });
+    }
+
     await db.savingsRecords.add({
       month: currentMonthStr,
-      amount: Number(amount),
+      amount: recordAmount,
       type,
       note: note.trim(),
-      date: getLocalDateString()
+      date: getLocalDateString(),
+      transactionId // 連動した取引IDを保持
     });
 
     setAmount('');
     setNote('');
+    setAutoLink(false);
   };
 
-  const handleDeleteRecord = async (id) => {
+  const handleDeleteRecord = async (record) => {
     if (window.confirm('この記録を削除しますか？')) {
-      await db.savingsRecords.delete(id);
+      if (record.transactionId) {
+        // 連動して登録された取引も自動削除する
+        await db.transactions.delete(record.transactionId);
+      }
+      await db.savingsRecords.delete(record.id);
     }
   };
 
@@ -82,17 +123,35 @@ export default function SavingsPage() {
         <div className="page-title" style={{ marginBottom: 0 }}>貯金・切り崩し管理</div>
       </div>
 
-      <div className="card mb-lg" style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white' }}>
+      {/* 👑 貯金総額 & グラフィカルな内訳グリッド */}
+      <div className="card mb-lg" style={{ 
+        background: 'linear-gradient(135deg, #064e3b 0%, #059669 100%)', 
+        color: 'white', 
+        padding: '24px', 
+        borderRadius: '24px',
+        boxShadow: '0 10px 15px -3px rgba(6, 78, 59, 0.2), 0 4px 6px -4px rgba(6, 78, 59, 0.1)'
+      }}>
         <div className="text-sm opacity-80 mb-xs">現在の仮想貯金総額</div>
-        <div className="text-3xl font-bold">{formatCurrency(currentTotalSavings)}</div>
-        <div className="mt-md pt-md" style={{ borderTop: '1px solid rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>
-          <div className="flex-between mb-xs">
-            <span>初期貯金 + 累計積立</span>
-            <span>{formatCurrency(initialSavings + monthlyAdditions)}</span>
+        <div className="text-4xl font-black mb-lg" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+          {formatCurrency(currentTotalSavings)}
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '16px' }}>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '10px 12px', borderRadius: '12px' }}>
+            <div className="text-[10px] opacity-70 mb-xs">初期貯金</div>
+            <div className="font-bold text-sm">{formatCurrency(initialSavings)}</div>
           </div>
-          <div className="flex-between">
-            <span>切り崩し累計</span>
-            <span style={{ color: '#fecaca' }}>- {formatCurrency(totalDepletions)}</span>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '10px 12px', borderRadius: '12px' }}>
+            <div className="text-[10px] opacity-70 mb-xs">毎月の積立累計</div>
+            <div className="font-bold text-sm" style={{ color: '#a7f3d0' }}>+{formatCurrency(monthlyAdditions)}</div>
+          </div>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '10px 12px', borderRadius: '12px' }}>
+            <div className="text-[10px] opacity-70 mb-xs">臨時追加累計</div>
+            <div className="font-bold text-sm" style={{ color: '#a7f3d0' }}>+{formatCurrency(extraAdditions)}</div>
+          </div>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '10px 12px', borderRadius: '12px' }}>
+            <div className="text-[10px] opacity-70 mb-xs">切り崩し累計</div>
+            <div className="font-bold text-sm" style={{ color: '#fecaca' }}>-{formatCurrency(totalDepletions)}</div>
           </div>
         </div>
       </div>
@@ -135,6 +194,7 @@ export default function SavingsPage() {
         </div>
       </div>
 
+      {/* 貯金の切り崩し・追加フォーム */}
       <div className="card mb-lg">
         <h3 className="font-bold mb-md">貯金の切り崩し・追加記録</h3>
         <form onSubmit={handleAddRecord}>
@@ -180,6 +240,62 @@ export default function SavingsPage() {
             />
           </div>
 
+          {/* 取引連動機能 */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px' }}>
+            <label className="flex items-center gap-sm cursor-pointer mb-md" style={{ userSelect: 'none' }}>
+              <input 
+                type="checkbox" 
+                checked={autoLink}
+                onChange={(e) => setAutoLink(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span className="text-xs font-bold flex items-center gap-xs text-secondary">
+                <Link2 size={14} /> 家計簿の取引履歴に自動反映する
+              </span>
+            </label>
+
+            {autoLink && (
+              <div className="animate-fade-in" style={{ backgroundColor: 'rgba(79, 70, 229, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(79, 70, 229, 0.08)', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-[10px]">
+                      {type === 'depletion' ? '振替元 (貯蓄元)' : '振替元 (生活費口座)'}
+                    </label>
+                    <select 
+                      className="form-control" 
+                      style={{ padding: '8px 12px', fontSize: '13px' }}
+                      value={fromAssetId}
+                      onChange={(e) => setFromAssetId(e.target.value)}
+                    >
+                      {assets.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-[10px]">
+                      {type === 'depletion' ? '振替先 (受取口座)' : '振替先 (貯蓄先)'}
+                    </label>
+                    <select 
+                      className="form-control" 
+                      style={{ padding: '8px 12px', fontSize: '13px' }}
+                      value={toAssetId}
+                      onChange={(e) => setToAssetId(e.target.value)}
+                    >
+                      {assets.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="text-[10px] text-secondary mt-sm flex items-start gap-xs" style={{ opacity: 0.8 }}>
+                  <AlertCircle size={12} style={{ marginTop: '1px', flexShrink: 0 }} />
+                  <span>指定口座間で振替取引が自動作成されます。この貯蓄記録を削除すると、紐づく振替取引も自動で削除されます。</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button type="submit" className="btn btn-primary w-full font-bold">
             記録する
           </button>
@@ -197,14 +313,21 @@ export default function SavingsPage() {
           {[...savingsRecords].reverse().map(record => (
             <div key={record.id} className="flex-between py-md" style={{ borderBottom: '1px solid var(--border-color)' }}>
               <div>
-                <div className="text-xs text-secondary">{record.month} / {record.date}</div>
+                <div className="text-xs text-secondary flex items-center gap-xs">
+                  <span>{record.month} / {record.date}</span>
+                  {record.transactionId && (
+                    <span className="flex items-center text-[9px] bg-slate-100 text-secondary px-xs py-2xs rounded-sm font-bold border border-slate-200">
+                      <Link2 size={8} className="mr-3xs" /> 連動済
+                    </span>
+                  )}
+                </div>
                 <div className="font-bold">{record.note || (record.type === 'depletion' ? '切り崩し' : '追加')}</div>
               </div>
               <div className="text-right">
                 <div className={`font-bold ${record.type === 'depletion' ? 'text-expense' : 'text-income'}`}>
                   {record.type === 'depletion' ? '-' : '+'}{formatCurrency(record.amount)}
                 </div>
-                <button className="text-xs text-danger-color mt-xs" onClick={() => handleDeleteRecord(record.id)}>削除</button>
+                <button className="text-xs text-danger-color mt-xs" onClick={() => handleDeleteRecord(record)} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>削除</button>
               </div>
             </div>
           ))}

@@ -502,3 +502,16 @@ input[type="datetime-local"].form-control {
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out;
 }
+
+.hover-bg-white-5 {
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.hover-bg-white-5:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.hover-bg-white-5:active {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(0.98);
+}

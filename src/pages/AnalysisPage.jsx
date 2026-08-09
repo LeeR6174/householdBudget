@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, 
-  LineChart, Line, AreaChart, Area, Legend, PieChart, Pie
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, 
+  AreaChart, Area, PieChart, Pie
 } from 'recharts';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth, getMonthRange, getLocalDateString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
 import MonthSelector from '../components/MonthSelector';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, Calendar, HelpCircle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, HelpCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function AnalysisPage() {
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
@@ -17,6 +17,7 @@ export default function AnalysisPage() {
   // 1. 基本データ取得
   const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const subscriptions = useLiveQuery(() => db.subscriptions.toArray()) || [];
   
   // 過去6ヶ月分のトレンド用データを取得
   const trendStartDate = useMemo(() => {
@@ -31,7 +32,7 @@ export default function AnalysisPage() {
       .toArray()
   , [trendStartDate, endDate]) || [];
 
-  // 2. データ加工
+  // 2. データ加工（当月）
   const currentMonthTx = allRelevantTx.filter(tx => tx.date >= startDate && tx.date <= endDate);
   
   const analytics = useMemo(() => {
@@ -41,27 +42,15 @@ export default function AnalysisPage() {
     const dailyExpenses = {};
     const assetTypeExpenses = { bank: 0, cash: 0, credit: 0 };
     
-    // 曜日別詳細データ (0:日, 1:月, ..., 6:土)
-    const dayOfWeekStats = {
-      0: { total: 0, count: 0 },
-      1: { total: 0, count: 0 },
-      2: { total: 0, count: 0 },
-      3: { total: 0, count: 0 },
-      4: { total: 0, count: 0 },
-      5: { total: 0, count: 0 },
-      6: { total: 0, count: 0 },
-    };
+    // 固定費・変動費の分類
+    let fixedExpense = 0;
+    let variableExpense = 0;
+    const fixedKeywords = ['家賃', '住宅', '電気', 'ガス', '水道', '通信', '光熱費', '保険', 'サブスク', 'ローン', '学費', '固定費', '定期'];
+    const subCategoryIds = subscriptions.map(s => s.categoryId);
 
-    // 今月の日数と各曜日の出現回数
+    // 今月の日数
     const d = new Date(startDate);
     const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    
-    for (let i = 1; i <= daysInMonth; i++) {
-      dailyExpenses[i] = 0;
-      const date = new Date(d.getFullYear(), d.getMonth(), i);
-      const dayOfWeek = date.getDay();
-      dayOfWeekStats[dayOfWeek].count++;
-    }
 
     currentMonthTx.forEach(tx => {
       if (tx.type === 'income') income += tx.amount;
@@ -79,37 +68,163 @@ export default function AnalysisPage() {
         const asset = assets.find(a => a.id === tx.assetId);
         if (asset) assetTypeExpenses[asset.type] += tx.amount;
 
-        // 曜日別詳細
-        const txDate = new Date(tx.date);
-        const dayOfWeek = txDate.getDay();
-        dayOfWeekStats[dayOfWeek].total += tx.amount;
+        // 固定費 vs 変動費
+        const cat = categories.find(c => c.id === tx.categoryId);
+        const isFixed = cat && (
+          subCategoryIds.includes(cat.id) ||
+          fixedKeywords.some(kw => cat.name.includes(kw))
+        );
+        
+        if (isFixed) {
+          fixedExpense += tx.amount;
+        } else {
+          variableExpense += tx.amount;
+        }
       }
     });
 
-    // 貯蓄率
     const savingsRate = income > 0 ? Math.max(0, ((income - expense) / income) * 100) : 0;
-
-    // 曜日別平均データの整形 (月曜から順に)
-    const weekdayNames = ['日', '月', '火', '水', '木', '金', '土'];
-    const weekdayChartData = [1, 2, 3, 4, 5, 6, 0].map(dayIdx => {
-      const stats = dayOfWeekStats[dayIdx];
-      return {
-        name: weekdayNames[dayIdx],
-        avg: stats.count > 0 ? Math.round(stats.total / stats.count) : 0,
-        dayIdx
-      };
-    });
-
-    // 最も出費が多い曜日
-    const maxSpendingDay = [...weekdayChartData].sort((a, b) => b.avg - a.avg)[0];
 
     return { 
       income, expense, catExpenses, dailyExpenses, assetTypeExpenses, 
-      weekdayChartData, maxSpendingDay, savingsRate, daysInMonth 
+      savingsRate, fixedExpense, variableExpense, daysInMonth 
     };
-  }, [currentMonthTx, startDate, assets]);
+  }, [currentMonthTx, startDate, assets, categories, subscriptions]);
 
-  // トレンドデータの整形
+  // 先月データの集計（MoM用）
+  const lastMonthStr = useMemo(() => {
+    const d = new Date(startDate);
+    d.setMonth(d.getMonth() - 1);
+    return getLocalDateString(d).slice(0, 7);
+  }, [startDate]);
+
+  const lastMonthStats = useMemo(() => {
+    const lastMonthTx = allRelevantTx.filter(tx => tx.date.startsWith(lastMonthStr));
+    let income = 0;
+    let expense = 0;
+    let variableExpense = 0;
+    
+    const fixedKeywords = ['家賃', '住宅', '電気', 'ガス', '水道', '通信', '光熱費', '保険', 'サブスク', 'ローン', '学費', '固定費', '定期'];
+    const subCategoryIds = subscriptions.map(s => s.categoryId);
+
+    lastMonthTx.forEach(tx => {
+      if (tx.type === 'income') income += tx.amount;
+      if (tx.type === 'expense') {
+        expense += tx.amount;
+        
+        const cat = categories.find(c => c.id === tx.categoryId);
+        const isFixed = cat && (
+          subCategoryIds.includes(cat.id) ||
+          fixedKeywords.some(kw => cat.name.includes(kw))
+        );
+        
+        if (!isFixed) {
+          variableExpense += tx.amount;
+        }
+      }
+    });
+
+    return { income, expense, variableExpense };
+  }, [allRelevantTx, lastMonthStr, categories, subscriptions]);
+
+  // 過去平均と比較した「削減ターゲット」自動選出ロジック
+  const reconciliationAdvice = useMemo(() => {
+    const pastMonths = [];
+    for (let i = 5; i >= 1; i--) {
+      const d = new Date(startDate);
+      d.setMonth(d.getMonth() - i);
+      pastMonths.push(getLocalDateString(d).slice(0, 7));
+    }
+
+    if (pastMonths.length === 0 || categories.length === 0) return null;
+
+    const categoryAverages = {};
+    categories.filter(c => c.type === 'expense').forEach(cat => {
+      const pastTx = allRelevantTx.filter(tx => 
+        tx.categoryId === cat.id && 
+        tx.type === 'expense' && 
+        pastMonths.some(m => tx.date.startsWith(m))
+      );
+      
+      const total = pastTx.reduce((sum, t) => sum + t.amount, 0);
+      categoryAverages[cat.id] = total / pastMonths.length;
+    });
+
+    let maxOverAmount = 0;
+    let targetCategory = null;
+    let avgAmountForTarget = 0;
+
+    categories.filter(c => c.type === 'expense').forEach(cat => {
+      const currentSpent = analytics.catExpenses[cat.id] || 0;
+      const average = categoryAverages[cat.id] || 0;
+      const overAmount = currentSpent - average;
+      
+      if (overAmount > maxOverAmount && average > 0) {
+        maxOverAmount = overAmount;
+        targetCategory = cat;
+        avgAmountForTarget = average;
+      }
+    });
+
+    return {
+      targetCategory,
+      overAmount: maxOverAmount,
+      average: avgAmountForTarget
+    };
+  }, [allRelevantTx, categories, startDate, analytics.catExpenses]);
+
+  // カテゴリ別支出推移のためのState
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategoryId) {
+      // 最大支出カテゴリを初期値とする
+      let maxCatId = '';
+      let maxAmount = -1;
+      categories.filter(c => c.type === 'expense').forEach(cat => {
+        const spent = analytics.catExpenses[cat.id] || 0;
+        if (spent > maxAmount) {
+          maxAmount = spent;
+          maxCatId = cat.id;
+        }
+      });
+      if (maxCatId) {
+        setSelectedCategoryId(maxCatId);
+      } else {
+        const expenseCats = categories.filter(c => c.type === 'expense');
+        if (expenseCats.length > 0) {
+          setSelectedCategoryId(expenseCats[0].id);
+        }
+      }
+    }
+  }, [categories, analytics.catExpenses, selectedCategoryId]);
+
+  // 選択カテゴリの過去6ヶ月の月別支出データ作成
+  const categoryTrendData = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(startDate);
+      d.setMonth(d.getMonth() - i);
+      months.push(getLocalDateString(d).slice(0, 7));
+    }
+
+    return months.map(m => {
+      const monthTx = allRelevantTx.filter(tx => 
+        tx.date.startsWith(m) && 
+        tx.categoryId === selectedCategoryId && 
+        tx.type === 'expense'
+      );
+      const amount = monthTx.reduce((sum, t) => sum + t.amount, 0);
+      return {
+        name: m.split('-')[1] + '月',
+        amount: amount
+      };
+    });
+  }, [allRelevantTx, selectedCategoryId, startDate]);
+
+  // トレンドデータの整形 (6ヶ月全体収支)
   const trendData = useMemo(() => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
@@ -148,13 +263,23 @@ export default function AnalysisPage() {
     { name: 'クレジットカード', value: analytics.assetTypeExpenses.credit, color: '#f43f5e' },
   ].filter(d => d.value > 0), [analytics.assetTypeExpenses]);
 
+  // プレミアムなガラスモルフィズム風カスタムツールチップ
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="card" style={{ padding: '8px 12px', border: '1px solid var(--border-color)', marginBottom: 0, boxShadow: 'var(--shadow-md)' }}>
-          <p className="font-bold text-xs mb-xs">{label}</p>
+        <div style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          boxShadow: 'var(--shadow-md)',
+          margin: 0
+        }}>
+          <p className="font-bold text-xs mb-xs" style={{ color: 'var(--text-secondary)', margin: '0 0 4px 0' }}>{label}</p>
           {payload.map((p, i) => (
-            <p key={i} style={{ color: p.color || p.fill, fontSize: '0.875rem', fontWeight: 700 }}>
+            <p key={i} style={{ color: p.color || p.fill, fontSize: '0.85rem', fontWeight: 800, margin: 0 }}>
               {p.name}: {formatCurrency(p.value)}
             </p>
           ))}
@@ -164,7 +289,7 @@ export default function AnalysisPage() {
     return null;
   };
 
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary', 'categories', 'weekday'
+  const [activeTab, setActiveTab] = useState('summary'); // 'summary', 'categories'
   const [showSavingsHelp, setShowSavingsHelp] = useState(false);
 
   return (
@@ -184,32 +309,135 @@ export default function AnalysisPage() {
           className={`toggle-btn ${activeTab === 'categories' ? 'active expense' : ''}`}
           onClick={() => setActiveTab('categories')}
         >
-          カテゴリ別
-        </button>
-        <button 
-          className={`toggle-btn ${activeTab === 'weekday' ? 'active expense' : ''}`}
-          onClick={() => setActiveTab('weekday')}
-        >
-          曜日別
+          カテゴリ分析
         </button>
       </div>
 
       {activeTab === 'summary' && (
         <div className="animate-fade-in">
-          {/* 1. 収支サマリー & 貯蓄率 */}
+          {/* 💡 削減ターゲット自動提案カード */}
+          {reconciliationAdvice && reconciliationAdvice.targetCategory ? (
+            <div className="card mb-md" style={{
+              backgroundColor: 'rgba(244, 63, 94, 0.04)',
+              border: '1px dashed rgba(244, 63, 94, 0.2)',
+              padding: '16px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'start',
+              gap: '12px'
+            }}>
+              <AlertCircle className="text-expense flex-shrink-0" size={20} style={{ marginTop: '2px' }} />
+              <div>
+                <h4 className="font-bold text-sm text-expense" style={{ margin: '0 0 4px 0' }}>💡 今月の削減ターゲット</h4>
+                <p className="text-xs text-secondary leading-relaxed" style={{ margin: 0 }}>
+                  今月は <span className="font-bold text-slate-800" style={{ color: 'var(--text-primary)' }}>{reconciliationAdvice.targetCategory.name}</span> の支出が過去平均（{formatCurrency(reconciliationAdvice.average)}）より <span className="font-black text-expense">{formatCurrency(reconciliationAdvice.overAmount)}</span> 多くなっています。少しセーブすることを意識してみましょう。
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="card mb-md" style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.04)',
+              border: '1px dashed rgba(16, 185, 129, 0.2)',
+              padding: '16px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <CheckCircle2 className="text-income flex-shrink-0" size={20} />
+              <div>
+                <h4 className="font-bold text-sm text-income" style={{ margin: '0 0 2px 0' }}>🎉 順調な家計簿</h4>
+                <p className="text-xs text-secondary" style={{ margin: 0 }}>
+                  すべてのカテゴリが過去の平均支出以下に抑えられています！素晴らしいペースです。
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 1. 収支サマリー & 前月比インジケータ */}
           <div className="grid grid-cols-2 gap-md mb-md" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div className="card" style={{ margin: 0, padding: '16px', backgroundColor: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
               <div className="text-[10px] text-secondary font-bold mb-xs flex items-center gap-xs">
                 <ArrowUpRight size={12} className="text-income" /> 収入
               </div>
-              <div className="text-xl font-bold text-income">{formatCurrency(analytics.income)}</div>
+              <div className="text-xl font-bold text-income flex items-center justify-between">
+                <span>{formatCurrency(analytics.income)}</span>
+                {lastMonthStats.income > 0 && (
+                  <span style={{
+                    fontSize: '9px',
+                    padding: '2px 6px',
+                    borderRadius: '9999px',
+                    backgroundColor: analytics.income >= lastMonthStats.income ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)',
+                    color: analytics.income >= lastMonthStats.income ? 'var(--income-color)' : 'var(--expense-color)',
+                    fontWeight: 'bold'
+                  }}>
+                    {analytics.income >= lastMonthStats.income ? `↑ ` : `↓ `}
+                    {Math.abs(((analytics.income - lastMonthStats.income) / lastMonthStats.income) * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
             </div>
             <div className="card" style={{ margin: 0, padding: '16px', backgroundColor: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.1)' }}>
               <div className="text-[10px] text-secondary font-bold mb-xs flex items-center gap-xs">
                 <ArrowDownRight size={12} className="text-expense" /> 支出
               </div>
-              <div className="text-xl font-bold text-expense">{formatCurrency(analytics.expense)}</div>
+              <div className="text-xl font-bold text-expense flex items-center justify-between">
+                <span>{formatCurrency(analytics.expense)}</span>
+                {lastMonthStats.expense > 0 && (
+                  <span style={{
+                    fontSize: '9px',
+                    padding: '2px 6px',
+                    borderRadius: '9999px',
+                    backgroundColor: analytics.expense <= lastMonthStats.expense ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)',
+                    color: analytics.expense <= lastMonthStats.expense ? 'var(--income-color)' : 'var(--expense-color)',
+                    fontWeight: 'bold'
+                  }}>
+                    {analytics.expense <= lastMonthStats.expense ? `↓ ` : `↑ `}
+                    {Math.abs(((analytics.expense - lastMonthStats.expense) / lastMonthStats.expense) * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
             </div>
+          </div>
+
+          {/* ⚖️ 固定費・変動費の分離分析 */}
+          <div className="card mb-md" style={{ padding: '20px' }}>
+            <h3 className="font-bold text-sm mb-sm flex items-center gap-xs text-primary" style={{ margin: '0 0 12px 0' }}>
+              ⚖️ 固定費・変動費バランス
+            </h3>
+            <div className="flex-between text-xs text-secondary mb-xs font-bold">
+              <span>固定費 (削りにくい)</span>
+              <span>変動費 (自分の努力)</span>
+            </div>
+            <div className="flex-between text-base font-bold mb-sm">
+              <span style={{ color: 'var(--primary-color)' }}>{formatCurrency(analytics.fixedExpense)}</span>
+              <span style={{ color: '#ec4899' }}>{formatCurrency(analytics.variableExpense)}</span>
+            </div>
+            <div className="progress-container" style={{ height: '10px', backgroundColor: 'rgba(0,0,0,0.05)', display: 'flex', overflow: 'hidden' }}>
+              <div style={{
+                width: `${analytics.expense > 0 ? (analytics.fixedExpense / analytics.expense) * 100 : 50}%`,
+                backgroundColor: 'var(--primary-color)',
+                height: '100%'
+              }}></div>
+              <div style={{
+                width: `${analytics.expense > 0 ? (analytics.variableExpense / analytics.expense) * 100 : 50}%`,
+                backgroundColor: '#ec4899',
+                height: '100%'
+              }}></div>
+            </div>
+            {lastMonthStats.variableExpense > 0 && (
+              <div className="text-[10px] text-secondary mt-md font-bold flex items-center justify-between" style={{ opacity: 0.8 }}>
+                <span>努力の成果 (変動費の前月比)</span>
+                <span style={{
+                  color: analytics.variableExpense <= lastMonthStats.variableExpense ? 'var(--income-color)' : 'var(--expense-color)',
+                  fontSize: '11px'
+                }}>
+                  {analytics.variableExpense <= lastMonthStats.variableExpense ? '▼ 先月より ' : '▲ 先月より '}
+                  {formatCurrency(Math.abs(analytics.variableExpense - lastMonthStats.variableExpense))}
+                  {analytics.variableExpense <= lastMonthStats.variableExpense ? ' 削減！' : ' 増加'}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="card mb-md" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white', padding: '24px' }}>
@@ -225,7 +453,7 @@ export default function AnalysisPage() {
                 <div className="text-xl font-bold">{formatCurrency(analytics.income - analytics.expense)}</div>
               </div>
             </div>
-            <div className="progress-container mt-md" style={{ backgroundColor: 'rgba(255,255,255,0.1)', height: '8px' }}>
+            <div className="progress-container" style={{ backgroundColor: 'rgba(255,255,255,0.1)', height: '8px' }}>
               <div className="progress-bar" style={{ width: `${Math.min(100, analytics.savingsRate)}%`, backgroundColor: analytics.savingsRate > 20 ? 'var(--income-color)' : analytics.savingsRate > 10 ? 'var(--warning-color)' : 'var(--expense-color)' }}></div>
             </div>
           </div>
@@ -233,18 +461,19 @@ export default function AnalysisPage() {
           {/* 貯蓄率の簡潔な説明 */}
           <div className="card mb-lg" style={{ backgroundColor: 'rgba(79, 70, 229, 0.05)', border: '1px solid rgba(79, 70, 229, 0.1)', padding: '16px' }}>
             <div className="flex-between items-center mb-sm">
-              <h4 className="text-sm font-bold text-primary flex items-center gap-xs">
+              <h4 className="text-sm font-bold text-primary flex items-center gap-xs" style={{ margin: 0 }}>
                 <TrendingUp size={16} /> 貯蓄率について
               </h4>
               <button 
                 onClick={() => setShowSavingsHelp(!showSavingsHelp)}
                 className="flex items-center gap-xs text-[10px] font-bold text-primary opacity-70 hover:opacity-100 transition-opacity"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
               >
                 <HelpCircle size={14} /> 詳しく見る
               </button>
             </div>
             
-            <p className="text-xs text-secondary leading-relaxed">
+            <p className="text-xs text-secondary leading-relaxed" style={{ margin: 0 }}>
               収入のうち、どれだけを将来のために残せたかを示す指標です。資産形成のスピードを測る重要な数字です。
             </p>
 
@@ -272,7 +501,7 @@ export default function AnalysisPage() {
 
           {/* 2. 推移グラフ */}
           <div className="card mb-lg">
-            <h3 className="font-bold mb-lg flex items-center gap-sm">
+            <h3 className="font-bold mb-lg flex items-center gap-sm" style={{ margin: '0 0 16px 0' }}>
               <TrendingUp size={18} className="text-primary" /> 月別推移 (6ヶ月)
             </h3>
             <div style={{ width: '100%', height: 200 }}>
@@ -294,8 +523,8 @@ export default function AnalysisPage() {
           </div>
 
           <div className="card" style={{ margin: 0 }}>
-            <h3 className="font-bold mb-md flex items-center gap-sm">
-              <CreditCard size={18} className="text-primary" /> 支払い方法別
+            <h3 className="font-bold mb-md flex items-center gap-sm text-primary" style={{ margin: '0 0 16px 0' }}>
+              <CreditCard size={18} /> 支払い方法別
             </h3>
             <div className="flex items-center">
               <div style={{ width: '50%', height: 140 }}>
@@ -335,20 +564,21 @@ export default function AnalysisPage() {
 
       {activeTab === 'categories' && (
         <div className="animate-fade-in">
+          {/* ドーナツチャート ＋ 中央総額ラベル */}
           <div className="card mb-lg">
-            <h3 className="font-bold mb-lg flex items-center gap-sm">
+            <h3 className="font-bold mb-lg flex items-center gap-sm" style={{ margin: '0 0 16px 0' }}>
               <TrendingUp size={18} className="text-primary" /> カテゴリ別支出内訳
             </h3>
-            <div style={{ width: '100%', height: 240 }}>
+            <div style={{ position: 'relative', width: '100%', height: 220 }}>
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
                     data={categoryChartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    innerRadius={65}
+                    outerRadius={85}
+                    paddingAngle={4}
                     dataKey="value"
                     startAngle={90}
                     endAngle={-270}
@@ -359,20 +589,83 @@ export default function AnalysisPage() {
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
                 </PieChart>
               </ResponsiveContainer>
+              
+              {/* ドーナツ中央ラベル */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                textAlign: 'center',
+                pointerEvents: 'none'
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>今月の総支出</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)', marginTop: '2px' }}>{formatCurrency(analytics.expense)}</div>
+              </div>
             </div>
           </div>
 
+          {/* 📈 カテゴリ別支出の時系列推移（過去6ヶ月） */}
+          <div className="card mb-lg">
+            <div className="flex-between items-center mb-md">
+              <h3 className="font-bold flex items-center gap-xs text-primary" style={{ margin: 0 }}>
+                <TrendingUp size={18} /> カテゴリ別推移 (6ヶ月)
+              </h3>
+              <select 
+                className="form-control"
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', margin: 0, height: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
+              >
+                {categories.filter(c => c.type === 'expense').map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {categoryTrendData.length > 0 && categoryTrendData.some(d => d.amount > 0) ? (
+              <div style={{ width: '100%', height: 200, marginTop: '16px' }}>
+                <ResponsiveContainer>
+                  <AreaChart data={categoryTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorCatTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={categories.find(c => c.id === selectedCategoryId)?.color || 'var(--primary-color)'} stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor={categories.find(c => c.id === selectedCategoryId)?.color || 'var(--primary-color)'} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} tickFormatter={(v) => v >= 10000 ? `${v/10000}万` : v} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area 
+                      type="monotone" 
+                      name="支出額" 
+                      dataKey="amount" 
+                      stroke={categories.find(c => c.id === selectedCategoryId)?.color || 'var(--primary-color)'} 
+                      strokeWidth={3} 
+                      fill="url(#colorCatTrend)" 
+                      animationDuration={1000} 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="py-xl text-center text-secondary text-sm">
+                このカテゴリの過去6ヶ月間の支出データがありません
+              </div>
+            )}
+          </div>
+
           <div className="card">
-            <h3 className="font-bold mb-lg">詳細リスト</h3>
+            <h3 className="font-bold mb-lg" style={{ margin: '0 0 16px 0' }}>詳細リスト</h3>
             {categoryChartData.length > 0 ? (
               <div className="mt-md">
                 {categoryChartData.map((item, idx) => (
                   <div key={idx} className="list-item" style={{ padding: '12px 0' }}>
                     <div className="flex items-center gap-md flex-1 min-w-0">
-                      <div className="category-block" style={{ backgroundColor: item.color, color: '#fff' }}>
+                      <div className="category-block" style={{ backgroundColor: item.fill, color: '#fff' }}>
                         {item.name.slice(0, 4)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -380,8 +673,8 @@ export default function AnalysisPage() {
                         <div className="progress-container" style={{ height: '6px', backgroundColor: 'rgba(0,0,0,0.03)' }}>
                           <div className="progress-bar" style={{ 
                             width: `${(item.value / analytics.expense) * 100}%`, 
-                            backgroundColor: item.color,
-                            boxShadow: `0 0 8px ${item.color}44`
+                            backgroundColor: item.fill,
+                            boxShadow: `0 0 8px ${item.fill}44`
                           }}></div>
                         </div>
                       </div>
@@ -397,64 +690,6 @@ export default function AnalysisPage() {
               <div className="py-xl text-center text-secondary">データがありません</div>
             )}
           </div>
-        </div>
-      )}
-
-      {activeTab === 'weekday' && (
-        <div className="animate-fade-in">
-          <div className="card mb-lg">
-            <h3 className="font-bold mb-lg flex items-center gap-sm">
-              <Calendar size={18} className="text-primary" /> 曜日別平均支出
-            </h3>
-            <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
-                <BarChart data={analytics.weekdayChartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700 }} />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10 }} 
-                    tickFormatter={(v) => v >= 10000 ? `${(v/10000).toFixed(1).replace('.0', '')}万` : v} 
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="avg" radius={[4, 4, 0, 0]} name="平均支出" animationDuration={1000}>
-                    {analytics.weekdayChartData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={analytics.expense > 0 && entry.avg === analytics.maxSpendingDay.avg ? 'var(--expense-color)' : 'var(--primary-color-light)'} 
-                        fillOpacity={analytics.expense > 0 && entry.avg === analytics.maxSpendingDay.avg ? 1 : 0.6}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {analytics.expense > 0 ? (
-            <div className="card" style={{ backgroundColor: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.1)', padding: '20px' }}>
-              <h4 className="font-bold text-expense flex items-center gap-sm mb-md">
-                <TrendingUp size={16} /> 曜日別の傾向分析
-              </h4>
-              <p className="text-xs font-bold text-secondary mb-md">
-                今月は <span className="text-expense text-lg">{analytics.maxSpendingDay.name}曜日</span> の出費が最も多い傾向にあります。
-              </p>
-              <div className="p-md rounded-xl bg-white shadow-sm border border-slate-50">
-                <div className="flex-between">
-                  <span className="text-xs font-bold text-secondary">{analytics.maxSpendingDay.name}曜日の平均支出</span>
-                  <span className="text-lg font-black text-expense">{formatCurrency(analytics.maxSpendingDay.avg)}</span>
-                </div>
-              </div>
-              <p className="text-[10px] mt-md text-secondary opacity-70 leading-relaxed">
-                ※ 各曜日の総支出を、その曜日の日数で割った「1日あたりの平均」を表示しています。特定の曜日に買い出しをまとめたり、固定の出費があったりする場合に数値が高くなります。
-              </p>
-            </div>
-          ) : (
-            <div className="card text-center py-xl text-secondary" style={{ backgroundColor: 'rgba(0,0,0,0.02)', border: '1px dashed var(--border-color)' }}>
-              今月の支出データがまだありません。
-            </div>
-          )}
         </div>
       )}
     </div>
