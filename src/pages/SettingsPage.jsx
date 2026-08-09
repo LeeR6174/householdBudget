@@ -320,7 +320,7 @@ export default function SettingsPage() {
               <button className="btn btn-primary w-full" onClick={() => navigate('/settings/categories')}>カテゴリ管理</button>
             </div>
             <div className="form-group mb-lg">
-              <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/savings')}>💰 貯金・切り崩し管理</button>
+              <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/analysis')}>📊 分析ダッシュボード</button>
             </div>
             <div className="form-group mb-lg">
               <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/subscriptions')}>サブスク・固定費の自動入力</button>

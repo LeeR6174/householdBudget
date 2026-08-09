@@ -18,6 +18,7 @@ export default function AddTransactionPage() {
   
   const [fromAssetId, setFromAssetId] = useState(''); // for transfer
   const [toAssetId, setToAssetId] = useState(''); // for transfer
+  const [isSavingsDepletion, setIsSavingsDepletion] = useState(false);
   
   const [content, setContent] = useState('');
   const [memo, setMemo] = useState('');
@@ -72,6 +73,7 @@ export default function AddTransactionPage() {
       setContent(existingTx.content || '');
       setMemo(existingTx.memo || '');
       setDate(existingTx.date);
+      setIsSavingsDepletion(existingTx.isSavingsDepletion || false);
     } else if (!isEditing && assets.length === 1) {
       // Auto-select asset if only one exists
       setAssetId(assets[0].id);
@@ -111,12 +113,23 @@ export default function AddTransactionPage() {
         baseTx.categoryId = null;
         baseTx.assetId = null;
       } else {
-        if (!categoryId || !assetId) {
-          alert('カテゴリと資産を選択してください');
-          return;
+        if (isSavingsDepletion) {
+          if (!assetId) {
+            alert('使用資産を選択してください');
+            return;
+          }
+          baseTx.categoryId = null;
+          baseTx.assetId = assetId;
+          baseTx.isSavingsDepletion = true;
+        } else {
+          if (!categoryId || !assetId) {
+            alert('カテゴリと資産を選択してください');
+            return;
+          }
+          baseTx.categoryId = categoryId;
+          baseTx.assetId = assetId;
+          baseTx.isSavingsDepletion = false;
         }
-        baseTx.categoryId = categoryId;
-        baseTx.assetId = assetId;
         baseTx.fromAssetId = null;
         baseTx.toAssetId = null;
 
@@ -218,6 +231,54 @@ export default function AddTransactionPage() {
 
         {type !== 'transfer' ? (
           <>
+            {/* 🐷 貯金（ロック分）から支払うチェックボックス */}
+            {type === 'expense' && (
+              <div 
+                className="form-group flex-between mb-md p-md" 
+                style={{ 
+                  backgroundColor: isSavingsDepletion ? 'rgba(79, 70, 229, 0.08)' : 'rgba(0,0,0,0.03)', 
+                  borderRadius: '16px', 
+                  cursor: 'pointer',
+                  border: isSavingsDepletion ? '1px solid var(--primary-color-light)' : '1px solid transparent',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: '12px'
+                }} 
+                onClick={() => setIsSavingsDepletion(!isSavingsDepletion)}
+              >
+                <div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: '700', color: isSavingsDepletion ? 'var(--primary-color)' : 'var(--text-primary)' }}>
+                    🐷 貯金（ロック分）から支払う
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    生活費の残り予算を削らずに、貯蓄から切り崩します
+                  </div>
+                </div>
+                <div style={{ 
+                  width: '44px', 
+                  height: '24px', 
+                  backgroundColor: isSavingsDepletion ? 'var(--primary-color)' : '#cbd5e1', 
+                  borderRadius: '12px', 
+                  position: 'relative',
+                  transition: 'background-color 0.2s',
+                  flexShrink: 0
+                }}>
+                  <div style={{ 
+                    width: '18px', 
+                    height: '18px', 
+                    backgroundColor: 'white', 
+                    borderRadius: '50%', 
+                    position: 'absolute', 
+                    top: '3px', 
+                    left: isSavingsDepletion ? '23px' : '3px',
+                    transition: 'left 0.2s'
+                  }}></div>
+                </div>
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">使用資産</label>
               <select className="form-control" value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
@@ -226,24 +287,27 @@ export default function AddTransactionPage() {
               </select>
             </div>
             
-            <div className="form-group">
-              <div className="flex-between mb-xs">
-                <label className="form-label" style={{ marginBottom: 0 }}>カテゴリ</label>
-                <button 
-                  type="button" 
-                  className="btn btn-outline" 
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', height: 'auto', width: 'auto' }}
-                  onClick={() => setIsAddingCategory(true)}
-                >
-                  <Plus size={14} style={{ marginRight: '2px', display: 'inline', verticalAlign: 'middle' }} />
-                  新規追加
-                </button>
+            {/* 貯金切崩しではない場合のみカテゴリ選択を表示する */}
+            {!isSavingsDepletion && (
+              <div className="form-group animate-fade-in">
+                <div className="flex-between mb-xs">
+                  <label className="form-label" style={{ marginBottom: 0 }}>カテゴリ</label>
+                  <button 
+                    type="button" 
+                    className="btn btn-outline" 
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', height: 'auto', width: 'auto' }}
+                    onClick={() => setIsAddingCategory(true)}
+                  >
+                    <Plus size={14} style={{ marginRight: '2px', display: 'inline', verticalAlign: 'middle' }} />
+                    新規追加
+                  </button>
+                </div>
+                <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required={!isSavingsDepletion}>
+                  <option value="" disabled>分類を選択</option>
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                </select>
               </div>
-              <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-                <option value="" disabled>分類を選択</option>
-                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-              </select>
-            </div>
+            )}
           </>
         ) : (
           <div className="flex gap-md mb-md">

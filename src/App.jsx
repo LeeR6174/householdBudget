@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Home, Clock, PieChart, Settings as SettingsIcon, CreditCard, BarChart2 } from 'lucide-react';
+import { Home, Clock, PieChart, Settings as SettingsIcon, CreditCard, BarChart2, PiggyBank } from 'lucide-react';
 import { initDB, db } from './db/db';
 import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from './utils/dateUtils';
 
@@ -23,21 +23,23 @@ function BottomNav() {
 
   return (
     <nav className="bottom-nav">
-      <Link to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
-        <Home size={24} />
-        <span style={{ fontSize: '10px' }}>ホーム</span>
-      </Link>
-      <Link to="/history" className={`nav-item ${isActive('/history')}`}>
-        <Clock size={24} />
-        <span style={{ fontSize: '10px' }}>履歴</span>
+      <Link to="/savings" className={`nav-item ${isActive('/savings')}`}>
+        <PiggyBank size={24} />
+        <span style={{ fontSize: '10px' }}>貯金</span>
       </Link>
       <Link to="/card" className={`nav-item ${isActive('/card')}`}>
         <CreditCard size={24} />
         <span style={{ fontSize: '10px' }}>カード</span>
       </Link>
-      <Link to="/analysis" className={`nav-item ${isActive('/analysis')}`}>
-        <BarChart2 size={24} />
-        <span style={{ fontSize: '10px' }}>分析</span>
+      <Link to="/" className={`nav-item nav-item-home ${location.pathname === '/' ? 'active' : ''}`}>
+        <div className="home-icon-wrapper">
+          <Home size={28} />
+        </div>
+        <span style={{ fontSize: '10px', marginTop: '2px' }}>ホーム</span>
+      </Link>
+      <Link to="/history" className={`nav-item ${isActive('/history')}`}>
+        <Clock size={24} />
+        <span style={{ fontSize: '10px' }}>履歴</span>
       </Link>
       <Link to="/settings" className={`nav-item ${isActive('/settings')}`}>
         <SettingsIcon size={24} />
@@ -145,7 +147,7 @@ function App() {
           <Route path="/settings/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/settings/initial-balance" element={<InitialBalancePage />} />
           <Route path="/settings/ai-import" element={<AIImportPage />} />
-          <Route path="/settings/savings" element={<SavingsPage />} />
+          <Route path="/savings" element={<SavingsPage />} />
         </Routes>
         <BottomNav />
       </div>

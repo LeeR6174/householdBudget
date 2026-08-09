@@ -53,9 +53,13 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       .filter(s => s.month <= currentMonth)
       .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
     
-    const totalDepletions = savingsRecords
+    const dbDepletions = savingsRecords
       .filter(r => r.type === 'depletion' && r.month <= currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
+    const txDepletions = allTx
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) <= currentMonth)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalDepletions = dbDepletions + txDepletions;
     
     const extraAdditions = savingsRecords
       .filter(r => r.type === 'addition' && r.month <= currentMonth)
@@ -65,9 +69,15 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
 
     // 当月の動きの計算
     const currentMonthTargetSavings = allMonthlySettings.find(s => s.month === currentMonth)?.targetSavings || 0;
-    const currentMonthDepletions = savingsRecords
+    
+    const dbCurrentMonthDepletions = savingsRecords
       .filter(r => r.type === 'depletion' && r.month === currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
+    const txCurrentMonthDepletions = allTx
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) === currentMonth)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const currentMonthDepletions = dbCurrentMonthDepletions + txCurrentMonthDepletions;
+
     const currentMonthExtraAdditions = savingsRecords
       .filter(r => r.type === 'addition' && r.month === currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
@@ -80,8 +90,10 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     currentMonthTx.forEach(t => {
       if (t.type === 'income') income += t.amount;
       if (t.type === 'expense') {
-        expense += t.amount;
-        expenseByCategory[t.categoryId || 'uncategorized'] = (expenseByCategory[t.categoryId || 'uncategorized'] || 0) + t.amount;
+        if (!t.isSavingsDepletion) {
+          expense += t.amount;
+          expenseByCategory[t.categoryId || 'uncategorized'] = (expenseByCategory[t.categoryId || 'uncategorized'] || 0) + t.amount;
+        }
       }
     });
 
