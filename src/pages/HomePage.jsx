@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getMonthRange, getLocalDateString } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import TransactionItem from '../components/TransactionItem';
+import ReconciliationModal from '../components/ReconciliationModal';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
 export default function HomePage() {
@@ -20,7 +21,6 @@ export default function HomePage() {
   // 照合モーダルの状態管理
   const masterSettings = useLiveQuery(() => db.settings.get('master'));
   const [showReconcileModal, setShowReconcileModal] = useState(false);
-  const [reconciledAmounts, setReconciledAmounts] = useState({});
   const [skipReconciliation, setSkipReconciliation] = useState(
     sessionStorage.getItem('skipReconciliation') === 'true'
   );
@@ -42,11 +42,6 @@ export default function HomePage() {
 
       if (shouldShow) {
         setShowReconcileModal(true);
-        const initialAmounts = {};
-        stats.assets.filter(a => a.type !== 'credit').forEach(a => {
-          initialAmounts[a.id] = '';
-        });
-        setReconciledAmounts(initialAmounts);
       }
     }
   }, [stats?.isLoaded, masterSettings, skipReconciliation]);
@@ -55,26 +50,6 @@ export default function HomePage() {
     sessionStorage.setItem('skipReconciliation', 'true');
     setSkipReconciliation(true);
     setShowReconcileModal(false);
-  };
-
-  const handleCompleteReconciliation = async () => {
-    const todayStr = getLocalDateString();
-    const existingHistory = masterSettings?.reconciliationHistory || [];
-    const newHistory = [...existingHistory, { date: todayStr, timestamp: new Date().toISOString() }];
-
-    await db.settings.update('master', {
-      lastReconciliationDate: todayStr,
-      reconciliationHistory: newHistory
-    });
-    setShowReconcileModal(false);
-    alert(`残高照合が完了しました！（照合日: ${todayStr}）`);
-  };
-
-  const handleReconciledAmountChange = (assetId, val) => {
-    setReconciledAmounts(prev => ({
-      ...prev,
-      [assetId]: val
-    }));
   };
   
   if (!stats) {
@@ -257,8 +232,46 @@ export default function HomePage() {
         </div>
       </div>
 
-      <h3 className="font-bold mb-md mt-lg">当月のカテゴリ別予算・支出</h3>
+      <div className="flex-between items-center mb-md mt-lg">
+        <h3 className="font-bold" style={{ margin: 0 }}>当月のカテゴリ別予算・支出</h3>
+        <button 
+          className="text-xs text-primary font-bold flex items-center gap-xs" 
+          onClick={() => navigate(`/budget?month=${currentMonth}`)}
+          style={{ 
+            background: 'rgba(79, 70, 229, 0.08)', 
+            border: 'none', 
+            padding: '6px 12px', 
+            borderRadius: '12px', 
+            cursor: 'pointer' 
+          }}
+        >
+          <SlidersHorizontal size={14} />
+          <span>予算設定</span>
+        </button>
+      </div>
+
       <div className="card">
+        {/* もし当月の総予算が未設定（0円）の場合にクイック設定アシストを表示 */}
+        {totalBudget === 0 && categoryStats.length > 0 && (
+          <div className="p-sm mb-md flex-between items-center" style={{ 
+            backgroundColor: 'rgba(79, 70, 229, 0.06)', 
+            borderRadius: '12px', 
+            border: '1px dashed var(--primary-color-light)' 
+          }}>
+            <div className="text-xs text-secondary font-bold flex items-center gap-xs">
+              <Sparkles size={14} className="text-primary" />
+              <span>今月の予算が未設定です</span>
+            </div>
+            <button 
+              className="btn btn-primary" 
+              style={{ fontSize: '0.75rem', padding: '6px 12px', height: 'auto', borderRadius: '8px', fontWeight: 'bold' }}
+              onClick={() => navigate(`/budget?month=${currentMonth}`)}
+            >
+              予算を設定する
+            </button>
+          </div>
+        )}
+
         {categoryStats.map(catStat => (
           <BudgetProgressBar 
             key={catStat.id} 
@@ -266,7 +279,7 @@ export default function HomePage() {
             spent={catStat.spent} 
             limit={catStat.limit}
             isCarryover={catStat.isCarryover}
-            onClick={() => navigate(`/settings/categories?edit=${catStat.id}`)}
+            onClick={() => navigate(`/budget?month=${currentMonth}`)}
           />
         ))}
         
@@ -284,7 +297,6 @@ export default function HomePage() {
           <p className="text-secondary text-sm text-center">カテゴリがありません</p>
         )}
 
-        
         <div className="flex-between text-xs text-secondary mt-xs" style={{ opacity: 0.8 }}>
           <span>積立を含む総合計</span>
           <div>
@@ -321,125 +333,12 @@ export default function HomePage() {
         <Plus size={28} />
       </button>
 
-      {/* 照合モーダル */}
-      {showReconcileModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999,
-          padding: '16px'
-        }}>
-          <div className="card animate-fade-in" style={{
-            width: '100%',
-            maxWidth: '400px',
-            backgroundColor: 'var(--surface-color)',
-            borderRadius: '24px',
-            boxShadow: 'var(--shadow-xl)',
-            padding: '24px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            margin: 0
-          }}>
-            <div className="flex-between items-center mb-xs">
-              <h3 className="font-bold text-lg flex items-center gap-xs text-primary" style={{ margin: 0 }}>
-                ⚖️ 週次の残高照合
-              </h3>
-              <button 
-                onClick={handleSkipReconciliation}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="text-xs text-secondary font-semibold mb-sm">
-              🗓 前回の最終照合日: {masterSettings?.lastReconciliationDate ? formatDate(masterSettings.lastReconciliationDate) : '未実施'}
-            </div>
-            
-            <p className="text-xs text-secondary mb-lg leading-relaxed">
-              実際の銀行残高や現金の額と、アプリ上の家計簿残高が一致しているか確認しましょう。
-            </p>
-
-            <div style={{ display: 'grid', gap: '16px' }}>
-              {stats.assets.filter(a => a.type !== 'credit').map(asset => {
-                const inputVal = reconciledAmounts[asset.id];
-                const realAmount = inputVal === '' || inputVal === undefined ? null : Number(inputVal);
-                const difference = realAmount !== null ? realAmount - (asset.balance || 0) : null;
-                
-                return (
-                  <div key={asset.id} style={{
-                    border: '1px solid var(--border-color)',
-                    padding: '14px',
-                    borderRadius: '16px',
-                    backgroundColor: 'rgba(0,0,0,0.01)'
-                  }}>
-                    <div className="flex-between mb-sm">
-                      <span className="font-bold text-sm text-secondary">{asset.name}</span>
-                      <span className="text-xs font-bold text-secondary">
-                        家計簿: <span className="font-black" style={{ color: 'var(--text-primary)' }}>{formatCurrency(asset.balance || 0)}</span>
-                      </span>
-                    </div>
-
-                    <div className="flex-center gap-sm">
-                      <input 
-                        type="number"
-                        inputMode="numeric"
-                        placeholder="実際の残高を入力"
-                        className="form-control"
-                        style={{ padding: '8px 12px', fontSize: '14px', flex: 1 }}
-                        value={inputVal ?? ''}
-                        onChange={(e) => handleReconciledAmountChange(asset.id, e.target.value)}
-                      />
-                      <span className="text-xs font-bold text-secondary">円</span>
-                    </div>
-
-                    {difference !== null && (
-                      <div className="mt-sm flex items-center gap-xs text-xs font-bold" style={{
-                        color: difference === 0 ? 'var(--income-color)' : 'var(--expense-color)'
-                      }}>
-                        {difference === 0 ? (
-                          <>
-                            <CheckCircle2 size={14} />
-                            <span>金額が完全に一致しています！🎉</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle size={14} />
-                            <span>差額: {difference > 0 ? `+${formatCurrency(difference)}` : formatCurrency(difference)} (家計簿とのズレあり)</span>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-sm mt-xl">
-              <button 
-                className="btn btn-outline" 
-                style={{ flex: 1 }}
-                onClick={handleSkipReconciliation}
-              >
-                今はしない
-              </button>
-              <button 
-                className="btn btn-primary" 
-                style={{ flex: 1, fontWeight: 'bold' }}
-                onClick={handleCompleteReconciliation}
-              >
-                完了する
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 残高照合モーダル */}
+      <ReconciliationModal 
+        isOpen={showReconcileModal} 
+        onClose={handleSkipReconciliation} 
+        onComplete={() => setShowReconcileModal(false)} 
+      />
     </div>
   );
 }

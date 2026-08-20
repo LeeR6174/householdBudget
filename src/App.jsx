@@ -16,6 +16,7 @@ import SubscriptionsPage from './pages/SubscriptionsPage';
 import InitialBalancePage from './pages/InitialBalancePage';
 import AIImportPage from './pages/AIImportPage';
 import SavingsPage from './pages/SavingsPage';
+import BudgetPage from './pages/BudgetPage';
 
 function BottomNav() {
   const location = useLocation();
@@ -142,7 +143,9 @@ function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/card" element={<CardPage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/budget" element={<BudgetPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/budget" element={<BudgetPage />} />
           <Route path="/settings/categories" element={<CategoriesPage />} />
           <Route path="/settings/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/settings/initial-balance" element={<InitialBalancePage />} />

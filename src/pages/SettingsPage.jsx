@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Trash2, Bell } from 'lucide-react';
+import { Trash2, Bell, Scale } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db, resetDB } from '../db/db';
 import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
+import ReconciliationModal from '../components/ReconciliationModal';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function SettingsPage() {
   const backupInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('data'); // 'data' or 'notifications'
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReconcileModal, setShowReconcileModal] = useState(false);
 
   // Notification form state
   const [notifyDay, setNotifyDay] = useState(1);
@@ -314,15 +316,46 @@ export default function SettingsPage() {
 
       {activeTab === 'data' ? (
         <>
+          {/* ⚖️ いつでも残高照合カード */}
+          <div className="card mb-lg" style={{ 
+            background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.06) 0%, rgba(59, 130, 246, 0.06) 100%)',
+            border: '1px solid rgba(99, 102, 241, 0.25)'
+          }}>
+            <div className="flex-between items-center mb-xs">
+              <h3 className="font-bold text-primary flex items-center gap-xs" style={{ margin: 0 }}>
+                <Scale size={20} />
+                <span>残高照合 (いつでも確認)</span>
+              </h3>
+              <span className="text-xs font-semibold text-secondary">
+                {settings?.lastReconciliationDate ? `最終: ${settings.lastReconciliationDate}` : '未実施'}
+              </span>
+            </div>
+            <p className="text-xs text-secondary mb-md leading-relaxed">
+              実際の銀行口座や現金の現在額と家計簿の残高が合っているか、いつでも確認・照合できます。
+            </p>
+            <button 
+              type="button" 
+              className="btn btn-primary w-full flex-center gap-xs font-bold"
+              style={{ height: '44px', borderRadius: '12px' }}
+              onClick={() => setShowReconcileModal(true)}
+            >
+              <Scale size={18} />
+              <span>今すぐ残高照合を行う</span>
+            </button>
+          </div>
+
           <div className="card mb-lg">
             <h3 className="font-bold mb-md">マスターデータ管理</h3>
-            <div className="form-group mb-lg">
+            <div className="form-group mb-md">
               <button className="btn btn-primary w-full" onClick={() => navigate('/settings/categories')}>カテゴリ管理</button>
             </div>
-            <div className="form-group mb-lg">
+            <div className="form-group mb-md">
+              <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/budget')}>📋 毎月の予算管理</button>
+            </div>
+            <div className="form-group mb-md">
               <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/analysis')}>📊 分析ダッシュボード</button>
             </div>
-            <div className="form-group mb-lg">
+            <div className="form-group mb-md">
               <button className="btn btn-outline w-full text-primary font-bold" onClick={() => navigate('/settings/subscriptions')}>サブスク・固定費の自動入力</button>
             </div>
             <div className="form-group">
@@ -467,6 +500,12 @@ export default function SettingsPage() {
         <div className="text-xs font-bold">格が違う家計簿</div>
         <div className="text-[10px]">Version 1.5.1.0</div>
       </div>
+
+      {/* 残高照合モーダル */}
+      <ReconciliationModal 
+        isOpen={showReconcileModal} 
+        onClose={() => setShowReconcileModal(false)} 
+      />
     </div>
   );
 }

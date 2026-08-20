@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { calculateCarryoverBalance } from '../utils/budgetUtils';
+import { getLocalDateString, getBudgetMonth } from '../utils/dateUtils';
 
 export function useDashboardStats(currentMonth, startDate, endDate) {
   return useLiveQuery(async () => {
@@ -25,19 +26,23 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     });
 
     const allTx = await db.transactions.toArray();
+    const todayStr = getLocalDateString();
 
-    // 2. 資産計算
+    // 2. 資産計算（本日時点の実残高）
     const assetBalances = {};
     assets.forEach(a => assetBalances[a.id] = a.initialBalance || 0);
 
     allTx.forEach(t => {
-      if (t.type === 'income') {
-        if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] += t.amount;
-      } else if (t.type === 'expense') {
-        if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
-      } else if (t.type === 'transfer') {
-        if (assetBalances[t.fromAssetId] !== undefined) assetBalances[t.fromAssetId] -= t.amount;
-        if (assetBalances[t.toAssetId] !== undefined) assetBalances[t.toAssetId] += t.amount;
+      // 本日以前（当日含む）の確定済み取引のみを資産残高に反映
+      if (t.date && t.date <= todayStr) {
+        if (t.type === 'income') {
+          if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] += t.amount;
+        } else if (t.type === 'expense') {
+          if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
+        } else if (t.type === 'transfer') {
+          if (assetBalances[t.fromAssetId] !== undefined) assetBalances[t.fromAssetId] -= t.amount;
+          if (assetBalances[t.toAssetId] !== undefined) assetBalances[t.toAssetId] += t.amount;
+        }
       }
     });
 
@@ -57,7 +62,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       .filter(r => r.type === 'depletion' && r.month <= currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
     const txDepletions = allTx
-      .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) <= currentMonth)
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= currentMonth)
       .reduce((sum, t) => sum + (t.amount || 0), 0);
     const totalDepletions = dbDepletions + txDepletions;
     
@@ -74,7 +79,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       .filter(r => r.type === 'depletion' && r.month === currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
     const txCurrentMonthDepletions = allTx
-      .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) === currentMonth)
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) === currentMonth)
       .reduce((sum, t) => sum + (t.amount || 0), 0);
     const currentMonthDepletions = dbCurrentMonthDepletions + txCurrentMonthDepletions;
 
