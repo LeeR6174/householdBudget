@@ -58,11 +58,16 @@ export default function HomePage() {
   };
 
   const handleCompleteReconciliation = async () => {
+    const todayStr = getLocalDateString();
+    const existingHistory = masterSettings?.reconciliationHistory || [];
+    const newHistory = [...existingHistory, { date: todayStr, timestamp: new Date().toISOString() }];
+
     await db.settings.update('master', {
-      lastReconciliationDate: getLocalDateString()
+      lastReconciliationDate: todayStr,
+      reconciliationHistory: newHistory
     });
     setShowReconcileModal(false);
-    alert('残高照合が完了しました！');
+    alert(`残高照合が完了しました！（照合日: ${todayStr}）`);
   };
 
   const handleReconciledAmountChange = (assetId, val) => {
@@ -131,17 +136,13 @@ export default function HomePage() {
         
         {/* ① 手元資金 */}
         <div 
-          onClick={() => navigate('/settings/initial-balance')}
           style={{ 
             position: 'relative', 
             zIndex: 1, 
-            cursor: 'pointer',
             padding: '8px 12px',
             margin: '0 -12px',
             borderRadius: '12px',
-            transition: 'background-color 0.2s',
           }}
-          className="hover-bg-white-5"
         >
           <div className="flex-between">
             <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>🏦 手元資金 (銀行＋現金)</div>
@@ -164,17 +165,13 @@ export default function HomePage() {
 
         {/* ② カード未払額 */}
         <div 
-          onClick={() => navigate('/card')}
           style={{ 
             position: 'relative', 
             zIndex: 1, 
-            cursor: 'pointer',
             padding: '8px 12px',
             margin: '0 -12px',
             borderRadius: '12px',
-            transition: 'background-color 0.2s',
           }}
-          className="hover-bg-white-5"
         >
           <div className="flex-between">
             <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>💳 カード未払総額</div>
@@ -186,17 +183,13 @@ export default function HomePage() {
 
         {/* ③ 貯金総額 */}
         <div 
-          onClick={() => navigate('/settings/savings')}
           style={{ 
             position: 'relative', 
             zIndex: 1, 
-            cursor: 'pointer',
             padding: '8px 12px',
             margin: '0 -12px',
             borderRadius: '12px',
-            transition: 'background-color 0.2s',
           }}
-          className="hover-bg-white-5"
         >
           <div className="flex-between">
             <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>🐷 貯金総額 (キープ分)</div>
@@ -215,21 +208,19 @@ export default function HomePage() {
 
         {/* ④ 今月の残り予算 */}
         <div 
-          onClick={() => navigate('/settings/categories')}
           style={{ 
             position: 'relative', 
             zIndex: 1, 
-            cursor: 'pointer',
             padding: '8px 12px',
             margin: '0 -12px',
             borderRadius: '12px',
-            transition: 'background-color 0.2s',
           }}
-          className="hover-bg-white-5"
         >
           <div className="flex-between">
             <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>📅 今月の残り生活費予算</div>
-            <div className="font-bold text-base" style={{ color: '#fed7aa' }}>− {formatCurrency(stats.remainingBudget)}</div>
+            <div className="font-bold text-base" style={{ color: stats.remainingBudget < 0 ? '#fca5a5' : '#fed7aa' }}>
+              {stats.remainingBudget < 0 ? `超過 -${formatCurrency(Math.abs(stats.remainingBudget))}` : `− ${formatCurrency(stats.remainingBudget)}`}
+            </div>
           </div>
           <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
             総予算 {formatCurrency(totalBudget)} / 今月の支出 {formatCurrency(expense)}
@@ -355,7 +346,7 @@ export default function HomePage() {
             overflowY: 'auto',
             margin: 0
           }}>
-            <div className="flex-between items-center mb-md">
+            <div className="flex-between items-center mb-xs">
               <h3 className="font-bold text-lg flex items-center gap-xs text-primary" style={{ margin: 0 }}>
                 ⚖️ 週次の残高照合
               </h3>
@@ -365,6 +356,10 @@ export default function HomePage() {
               >
                 <X size={20} />
               </button>
+            </div>
+            
+            <div className="text-xs text-secondary font-semibold mb-sm">
+              🗓 前回の最終照合日: {masterSettings?.lastReconciliationDate ? formatDate(masterSettings.lastReconciliationDate) : '未実施'}
             </div>
             
             <p className="text-xs text-secondary mb-lg leading-relaxed">
