@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth, getLocalDateString } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getLocalDateString, getBudgetMonth } from '../utils/dateUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ export default function SavingsPage() {
       .filter(r => r.type === 'depletion' && r.month <= currentMonthStr)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
     const txDepletions = transactions
-      .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) <= currentMonthStr)
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= currentMonthStr)
       .reduce((sum, t) => sum + (t.amount || 0), 0);
     return dbDepletions + txDepletions;
   }, [savingsRecords, transactions, currentMonthStr]);
@@ -69,7 +69,7 @@ export default function SavingsPage() {
         .reduce((sum, r) => sum + (r.amount || 0), 0);
 
       const txDepletions = transactions
-        .filter(t => t.type === 'expense' && t.isSavingsDepletion && t.date.substring(0, 7) <= m)
+        .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= m)
         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
       const balance = initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions);
@@ -86,7 +86,7 @@ export default function SavingsPage() {
     return transactions.filter(t => 
       t.type === 'expense' && 
       t.isSavingsDepletion && 
-      t.date.substring(0, 7) === currentMonthStr
+      getBudgetMonth(t.date) === currentMonthStr
     );
   }, [transactions, currentMonthStr]);
 
@@ -111,7 +111,7 @@ export default function SavingsPage() {
         originalId: t.id,
         isTx: true,
         date: t.date,
-        month: t.date.substring(0, 7),
+        month: getBudgetMonth(t.date),
         type: 'depletion',
         amount: t.amount,
         note: t.content || '貯金切り崩し支出',

@@ -227,6 +227,11 @@ export default function AddTransactionPage() {
             onChange={(e) => setDate(e.target.value)}
             required
           />
+          {date > getLocalDateString() && (
+            <div className="text-xs text-primary font-bold mt-xs flex items-center gap-xs">
+              <span>📅 未来の日付です（予定として記録されます）</span>
+            </div>
+          )}
         </div>
 
         {type !== 'transfer' ? (
