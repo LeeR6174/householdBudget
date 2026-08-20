@@ -149,7 +149,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     const uncategorizedExpense = expenseByCategory['uncategorized'] || 0;
 
     // 残り予算の計算
-    const remainingBudget = Math.max(0, totalBudget - expense);
+    const remainingBudget = totalBudget - expense;
 
     // 実質残高（使えるお金）の計算
     const netWorth = realBalance + creditBalance - totalSavings - remainingBudget;
