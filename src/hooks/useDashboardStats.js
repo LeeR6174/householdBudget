@@ -153,11 +153,18 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     const recentTransactions = currentMonthTx.slice(0, 5);
     const uncategorizedExpense = expenseByCategory['uncategorized'] || 0;
 
-    // 残り予算の計算
-    const remainingBudget = totalBudget - expense;
+    // 1. 実質残高（現在のフリー資金：手元資金 - カード未払総額 - 貯金総額）
+    const realNetBalance = realBalance + creditBalance - totalSavings;
 
-    // 実質残高（使えるお金）の計算
-    const netWorth = realBalance + creditBalance - totalSavings - remainingBudget;
+    // 2. 残り予算の計算
+    const remainingBudget = totalBudget - expense;
+    const effectiveRemainingBudget = Math.max(0, remainingBudget);
+
+    // 3. 今月末での予測金（実質残高 - 残り予算）
+    const projectedMonthEndBalance = realNetBalance - effectiveRemainingBudget;
+
+    // 後方互換性のための netWorth
+    const netWorth = realNetBalance;
 
     // アセットに現在の計算残高をマッピング
     const assetsWithBalances = assets.map(a => ({
@@ -179,6 +186,8 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       currentMonthDepletions,
       currentMonthExtraAdditions,
       remainingBudget,
+      realNetBalance,
+      projectedMonthEndBalance,
       netWorth,
       income,
       expense,
