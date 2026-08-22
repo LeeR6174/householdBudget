@@ -68,14 +68,20 @@ export default function HomePage() {
     cashBalance,
     unpaidTotal,
     totalSavings,
+    realNetBalance,
+    projectedMonthEndBalance,
     netWorth,
     income,
     expense,
     totalBudget,
+    remainingBudget,
     recentTransactions,
     categoryStats,
     uncategorizedExpense
   } = stats;
+
+  const currentRealNet = realNetBalance !== undefined ? realNetBalance : netWorth;
+  const currentProjected = projectedMonthEndBalance !== undefined ? projectedMonthEndBalance : (currentRealNet - Math.max(0, remainingBudget || 0));
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
@@ -179,43 +185,58 @@ export default function HomePage() {
           )}
         </div>
 
-        <div style={{ borderLeft: '2px dashed rgba(255,255,255,0.2)', height: '16px', marginLeft: '12px', margin: '4px 0' }}></div>
-
-        {/* ④ 今月の残り予算 */}
-        <div 
-          style={{ 
-            position: 'relative', 
-            zIndex: 1, 
-            padding: '8px 12px',
-            margin: '0 -12px',
-            borderRadius: '12px',
-          }}
-        >
-          <div className="flex-between">
-            <div className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>📅 今月の残り生活費予算</div>
-            <div className="font-bold text-base" style={{ color: stats.remainingBudget < 0 ? '#fca5a5' : '#fed7aa' }}>
-              {stats.remainingBudget < 0 ? `超過 -${formatCurrency(Math.abs(stats.remainingBudget))}` : `− ${formatCurrency(stats.remainingBudget)}`}
-            </div>
-          </div>
-          <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            総予算 {formatCurrency(totalBudget)} / 今月の支出 {formatCurrency(expense)}
-          </div>
-        </div>
-
         {/* イコール線 */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', margin: '12px 0 8px 0', position: 'relative', zIndex: 1 }}></div>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', margin: '14px 0 10px 0', position: 'relative', zIndex: 1 }}></div>
 
-        {/* ⑤ 実質残高 */}
+        {/* ④ 実質残高（現在のフリー資金） */}
         <div style={{ position: 'relative', zIndex: 1, padding: '4px 0' }}>
           <div className="flex-between items-center flex-wrap gap-xs">
             <div>
-              <div className="text-sm font-bold" style={{ color: '#38bdf8' }}>💎 実質残高 (使えるお金)</div>
-              <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>今月予算通りに使っても残るフリー資金</div>
+              <div className="text-sm font-bold" style={{ color: '#38bdf8' }}>💎 実質残高 (現在のフリー資金)</div>
+              <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>手元資金 − カード未払額 − 貯金総額</div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-black" style={{ color: netWorth < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)', lineHeight: '1.1' }}>
-                {formatCurrency(netWorth)}
+              <div className="text-3xl font-black" style={{ color: currentRealNet < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)', lineHeight: '1.1' }}>
+                {formatCurrency(currentRealNet)}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ⑤ 今月の予算 & 今月末での予測金 */}
+        <div style={{ 
+          marginTop: '16px', 
+          padding: '12px 14px', 
+          backgroundColor: 'rgba(255,255,255,0.06)', 
+          borderRadius: '16px', 
+          border: '1px solid rgba(255,255,255,0.1)',
+          position: 'relative', 
+          zIndex: 1 
+        }}>
+          {/* 総予算 / 支出 */}
+          <div className="flex-between items-center mb-xs">
+            <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.8)' }}>📅 今月の総予算 / 支出</span>
+            <span className="text-xs font-bold" style={{ color: '#fed7aa' }}>
+              {formatCurrency(totalBudget)} / {formatCurrency(expense)}
+            </span>
+          </div>
+          <div className="flex-between items-center text-[11px] mb-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <span>残り予算</span>
+            <span className="font-bold" style={{ color: (remainingBudget ?? 0) < 0 ? '#fca5a5' : '#a7f3d0' }}>
+              {(remainingBudget ?? 0) < 0 ? `超過 -${formatCurrency(Math.abs(remainingBudget))}` : formatCurrency(remainingBudget || 0)}
+            </span>
+          </div>
+
+          <div style={{ borderTop: '1px dashed rgba(255,255,255,0.15)', margin: '10px 0 8px 0' }}></div>
+
+          {/* 今月末での予測金 */}
+          <div className="flex-between items-center">
+            <div>
+              <div className="text-xs font-bold" style={{ color: '#c084fc' }}>🔮 今月末での予測金</div>
+              <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>実質残高 − 残り予算 (予算消化後の着地)</div>
+            </div>
+            <div className="text-xl font-black" style={{ color: currentProjected < 0 ? '#fca5a5' : '#e9d5ff' }}>
+              {formatCurrency(currentProjected)}
             </div>
           </div>
         </div>
