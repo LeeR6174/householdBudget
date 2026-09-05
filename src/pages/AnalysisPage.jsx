@@ -72,8 +72,12 @@ export default function AnalysisPage() {
 
           // 固定費 vs 変動費 vs 緊急支出
           const cat = categories.find(c => c.id === tx.categoryId);
-          const isEmergency = cat && (cat.isEmergency || cat.isFixed || cat.name === '緊急支出');
-          const isFixed = cat && (
+          const isEmergency = cat && (
+            cat.id === 'cat_special_emergency' ||
+            cat.isEmergency ||
+            cat.name === '緊急支出'
+          );
+          const isFixed = !isEmergency && cat && (
             subCategoryIds.includes(cat.id) ||
             fixedKeywords.some(kw => cat.name.includes(kw))
           );
@@ -121,8 +125,12 @@ export default function AnalysisPage() {
           expense += tx.amount;
           
           const cat = categories.find(c => c.id === tx.categoryId);
-          const isEmergency = cat && (cat.isEmergency || cat.isFixed || cat.name === '緊急支出');
-          const isFixed = cat && (
+          const isEmergency = cat && (
+            cat.id === 'cat_special_emergency' ||
+            cat.isEmergency ||
+            cat.name === '緊急支出'
+          );
+          const isFixed = !isEmergency && cat && (
             subCategoryIds.includes(cat.id) ||
             fixedKeywords.some(kw => cat.name.includes(kw))
           );
@@ -653,7 +661,7 @@ export default function AnalysisPage() {
                 value={selectedCategoryId}
                 onChange={(e) => setSelectedCategoryId(e.target.value)}
               >
-                {categories.filter(c => c.type === 'expense').map(cat => (
+                {categories.filter(c => c.type === 'expense' && c.id !== 'cat_special_emergency' && !c.isEmergency && c.name !== '緊急支出').map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
