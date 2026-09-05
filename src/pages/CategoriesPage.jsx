@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth } from '../utils/dateUtils';
 import { ensurePastBudgets } from '../utils/budgetUtils';
@@ -81,6 +81,11 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (id) => {
+    const cat = categories.find(c => c.id === id);
+    if (cat?.isEmergency || cat?.isFixed || cat?.name === '緊急支出') {
+      alert('「緊急支出」は固定枠のため削除できません。');
+      return;
+    }
     if (window.confirm('このカテゴリを削除しますか？（過去の記録のカテゴリは「不明」と表示されるようになります）')) {
       await db.categories.delete(id);
     }
@@ -117,23 +122,33 @@ export default function CategoriesPage() {
     e.preventDefault();
     if (!name.trim()) return alert('カテゴリ名を入力してください');
 
+    if (!editId && name.trim() === '緊急支出') {
+      return alert('「緊急支出」は既に固定枠として登録されています');
+    }
+
+    const oldCat = editId ? categories.find(c => c.id === editId) : null;
+    const isEmergency = oldCat?.isEmergency || oldCat?.isFixed || oldCat?.name === '緊急支出';
+
     const catData = {
-      name: name.trim(),
-      type,
+      name: isEmergency ? '緊急支出' : name.trim(),
+      type: isEmergency ? 'expense' : type,
       color,
-      monthlyLimit: Number(monthlyLimit) || 0,
-      isCarryover,
+      monthlyLimit: isEmergency ? 0 : (Number(monthlyLimit) || 0),
+      isCarryover: isEmergency ? false : isCarryover,
       description: description.trim()
     };
+    if (isEmergency) {
+      catData.isEmergency = true;
+      catData.isFixed = true;
+    }
 
     if (editId) {
-      const oldCat = categories.find(c => c.id === editId);
       const oldLimit = oldCat?.monthlyLimit || 0;
       await ensurePastBudgets(editId, oldLimit, currentMonthStr);
 
       await db.categories.update(editId, catData);
-      // Save monthly budget if specified
-      if (thisMonthBudget !== '') {
+      // Save monthly budget if specified (緊急支出は月別予算なし)
+      if (thisMonthBudget !== '' && !isEmergency) {
         const existing = await db.monthlyBudgets
           .where('categoryId').equals(editId)
           .and(b => b.month === currentMonthStr)
@@ -175,45 +190,95 @@ export default function CategoriesPage() {
   const CategoryList = ({ cats, title }) => (
     <div className="mb-lg">
       <h3 className="font-bold mb-sm text-secondary">{title}</h3>
-      {cats.map((cat, index) => (
-        <div key={cat.id} className="list-item" style={{ padding: '8px 0' }}>
-          <div className="flex-center gap-sm">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color || '#333' }}></div>
-            <div className="flex flex-col">
-              <span className="font-semibold">{cat.name}</span>
-              {cat.description && <span className="text-xs text-secondary">{cat.description}</span>}
+      {cats.map((cat, index) => {
+        const isEmergency = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+        return (
+          <div 
+            key={cat.id} 
+            className="list-item" 
+            style={{ 
+              padding: '10px 12px',
+              backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.04)' : 'transparent',
+              borderRadius: isEmergency ? '14px' : '0',
+              border: isEmergency ? '1px dashed rgba(239, 68, 68, 0.25)' : 'none',
+              marginBottom: isEmergency ? '6px' : '0'
+            }}
+          >
+            <div className="flex-center gap-sm">
+              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color || '#333' }}></div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-xs flex-wrap">
+                  <span className="font-semibold">{cat.name}</span>
+                  {isEmergency && (
+                    <span style={{ 
+                      fontSize: '0.65rem', 
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)', 
+                      color: 'var(--expense-color)', 
+                      padding: '1px 7px', 
+                      borderRadius: '9999px',
+                      fontWeight: 'bold',
+                      border: '1px solid rgba(239, 68, 68, 0.3)'
+                    }}>
+                      🚨 緊急枠（上限なし）
+                    </span>
+                  )}
+                  {cat.isCarryover && (
+                    <span style={{ 
+                      fontSize: '0.65rem', 
+                      backgroundColor: 'var(--primary-color)', 
+                      color: 'white', 
+                      padding: '1px 6px', 
+                      borderRadius: '4px',
+                      fontWeight: '600'
+                    }}>
+                      積立型
+                    </span>
+                  )}
+                </div>
+                {cat.description && <span className="text-xs text-secondary">{cat.description}</span>}
+              </div>
+            </div>
+            <div className="flex gap-xs items-center" style={{ flexShrink: 0 }}>
+              <button 
+                type="button"
+                onClick={() => handleMove(cats, index, -1)} 
+                className="btn-icon" 
+                disabled={index === 0}
+                style={{ opacity: index === 0 ? 0.3 : 1, cursor: index === 0 ? 'not-allowed' : 'pointer' }}
+                title="上に移動"
+              >
+                <ChevronUp size={18} />
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleMove(cats, index, 1)} 
+                className="btn-icon" 
+                disabled={index === cats.length - 1}
+                style={{ opacity: index === cats.length - 1 ? 0.3 : 1, cursor: index === cats.length - 1 ? 'not-allowed' : 'pointer' }}
+                title="下に移動"
+              >
+                <ChevronDown size={18} />
+              </button>
+              <button onClick={() => handleEdit(cat)} className="btn-icon" title="編集">
+                <Edit2 size={18} />
+              </button>
+              {isEmergency ? (
+                <div 
+                  className="flex-center" 
+                  style={{ width: '32px', height: '32px', color: 'var(--text-secondary)', opacity: 0.5 }} 
+                  title="固定カテゴリ（削除不可）"
+                >
+                  <Lock size={15} />
+                </div>
+              ) : (
+                <button onClick={() => handleDelete(cat.id)} className="btn-icon text-danger" title="削除">
+                  <Trash2 size={18} />
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex gap-xs" style={{ flexShrink: 0 }}>
-            <button 
-              type="button"
-              onClick={() => handleMove(cats, index, -1)} 
-              className="btn-icon" 
-              disabled={index === 0}
-              style={{ opacity: index === 0 ? 0.3 : 1, cursor: index === 0 ? 'not-allowed' : 'pointer' }}
-              title="上に移動"
-            >
-              <ChevronUp size={18} />
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleMove(cats, index, 1)} 
-              className="btn-icon" 
-              disabled={index === cats.length - 1}
-              style={{ opacity: index === cats.length - 1 ? 0.3 : 1, cursor: index === cats.length - 1 ? 'not-allowed' : 'pointer' }}
-              title="下に移動"
-            >
-              <ChevronDown size={18} />
-            </button>
-            <button onClick={() => handleEdit(cat)} className="btn-icon" title="編集">
-              <Edit2 size={18} />
-            </button>
-            <button onClick={() => handleDelete(cat.id)} className="btn-icon text-danger" title="削除">
-              <Trash2 size={18} />
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
       {cats.length === 0 && <p className="text-secondary text-sm">カテゴリがありません</p>}
     </div>
   );
@@ -299,101 +364,137 @@ export default function CategoriesPage() {
             </div>
 
             <form onSubmit={handleSave}>
-              <div className="form-group">
-                <label className="form-label">カテゴリ名</label>
-                <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} required placeholder="例: 交際費" />
-              </div>
-              
-              <div className="flex gap-md mb-md">
-                <div className="flex-1">
-                  <label className="form-label">収支タイプ</label>
-                  <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
-                    <option value="expense">支出</option>
-                    <option value="income">収入</option>
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="form-label">カラー</label>
-                  <input type="color" className="form-control" style={{ padding: '4px', height: '46px' }} value={color} onChange={e => setColor(e.target.value)} />
-                </div>
-              </div>
-              
-              <div className="form-group mb-md">
-                <label className="form-label">説明 (任意)</label>
-                <textarea 
-                  className="form-control" 
-                  value={description} 
-                  onChange={e => setDescription(e.target.value)} 
-                  placeholder="カテゴリの詳細やメモを入力" 
-                  rows="2"
-                  style={{ resize: 'none' }}
-                />
-              </div>
+              {(() => {
+                const editingCat = categories.find(c => c.id === editId);
+                const isEditingEmergency = editingCat?.isEmergency || editingCat?.isFixed || editingCat?.name === '緊急支出';
 
-              {type === 'expense' && (
-                <>
-                  <div className="form-group mb-md">
-                    <label className="form-label">基本の月額予算 (円)</label>
-                    <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
-                  </div>
-
-                  <div 
-                    className="form-group flex-between mb-md p-md" 
-                    style={{ 
-                      backgroundColor: isCarryover ? 'rgba(79, 70, 229, 0.1)' : 'rgba(0,0,0,0.03)', 
-                      borderRadius: '16px', 
-                      cursor: 'pointer',
-                      border: isCarryover ? '1px solid var(--primary-color-light)' : '1px solid transparent',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }} 
-                    onClick={() => setIsCarryover(!isCarryover)}
-                  >
-                    <div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: '700', color: isCarryover ? 'var(--primary-color)' : 'var(--text-primary)' }}>
-                        予算を翌月に繰り越す（積立型）
+                return (
+                  <>
+                    {isEditingEmergency && (
+                      <div className="p-md mb-md rounded-xl" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '14px' }}>
+                        <div className="font-bold text-sm text-expense flex items-center gap-xs mb-xs">
+                          🚨 固定カテゴリ「緊急支出」
+                        </div>
+                        <p className="text-xs text-secondary leading-relaxed" style={{ margin: 0 }}>
+                          緊急支出は上限がなく、今月の総予算に含まれない特別枠です。突発的な出費に備える枠のため、予算や積立の設定は行いません。
+                        </p>
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        使わなかった分が翌月に加算されます
+                    )}
+
+                    <div className="form-group">
+                      <label className="form-label">カテゴリ名</label>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        value={name} 
+                        onChange={e => setName(e.target.value)} 
+                        required 
+                        placeholder="例: 交際費" 
+                        readOnly={isEditingEmergency}
+                        style={isEditingEmergency ? { backgroundColor: 'rgba(0,0,0,0.03)', cursor: 'not-allowed' } : {}}
+                      />
+                      {isEditingEmergency && <span className="text-xs text-secondary mt-xs block">※固定枠のため名称は変更できません</span>}
+                    </div>
+                    
+                    <div className="flex gap-md mb-md">
+                      <div className="flex-1">
+                        <label className="form-label">収支タイプ</label>
+                        <select 
+                          className="form-control" 
+                          value={type} 
+                          onChange={e => setType(e.target.value)}
+                          disabled={isEditingEmergency}
+                          style={isEditingEmergency ? { backgroundColor: 'rgba(0,0,0,0.03)', cursor: 'not-allowed' } : {}}
+                        >
+                          <option value="expense">支出</option>
+                          <option value="income">収入</option>
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="form-label">カラー</label>
+                        <input type="color" className="form-control" style={{ padding: '4px', height: '46px' }} value={color} onChange={e => setColor(e.target.value)} />
                       </div>
                     </div>
-                    <div style={{ 
-                      width: '44px', 
-                      height: '24px', 
-                      backgroundColor: isCarryover ? 'var(--primary-color)' : '#cbd5e1', 
-                      borderRadius: '12px', 
-                      position: 'relative',
-                      transition: 'background-color 0.2s',
-                      flexShrink: 0
-                    }}>
-                      <div style={{ 
-                        width: '18px', 
-                        height: '18px', 
-                        backgroundColor: 'white', 
-                        borderRadius: '50%', 
-                        position: 'absolute', 
-                        top: '3px', 
-                        left: isCarryover ? '23px' : '3px',
-                        transition: 'left 0.2s'
-                      }}></div>
+                    
+                    <div className="form-group mb-md">
+                      <label className="form-label">説明 (任意)</label>
+                      <textarea 
+                        className="form-control" 
+                        value={description} 
+                        onChange={e => setDescription(e.target.value)} 
+                        placeholder="カテゴリの詳細やメモを入力" 
+                        rows="2"
+                        style={{ resize: 'none' }}
+                      />
                     </div>
-                  </div>
 
-                  <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                    <label className="form-label" style={{ color: 'var(--primary-color)' }}>
-                      ✨ {currentMonthStr} {isCarryover ? '限定の積立額' : '限定の予算'} (任意)
-                    </label>
-                    <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder={isCarryover ? "今月だけ積立額を変える場合" : "今月だけ予算を変える場合"} style={{ borderColor: 'var(--primary-color-light)' }} />
-                    <p className="text-xs text-secondary mt-xs">
-                      {isCarryover 
-                        ? "※未入力の場合は基本の積立額が適用されます。0を入力すると今月は積み立てません。" 
-                        : "※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。"}
-                    </p>
-                  </div>
-                </>
-              )}
+                    {type === 'expense' && !isEditingEmergency && (
+                      <>
+                        <div className="form-group mb-md">
+                          <label className="form-label">基本の月額予算 (円)</label>
+                          <input type="number" inputMode="numeric" className="form-control" value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} placeholder="0 (無制限)" />
+                        </div>
+
+                        <div 
+                          className="form-group flex-between mb-md p-md" 
+                          style={{ 
+                            backgroundColor: isCarryover ? 'rgba(79, 70, 229, 0.1)' : 'rgba(0,0,0,0.03)', 
+                            borderRadius: '16px', 
+                            cursor: 'pointer',
+                            border: isCarryover ? '1px solid var(--primary-color-light)' : '1px solid transparent',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }} 
+                          onClick={() => setIsCarryover(!isCarryover)}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: '700', color: isCarryover ? 'var(--primary-color)' : 'var(--text-primary)' }}>
+                              予算を翌月に繰り越す（積立型）
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              使わなかった分が翌月に加算されます
+                            </div>
+                          </div>
+                          <div style={{ 
+                            width: '44px', 
+                            height: '24px', 
+                            backgroundColor: isCarryover ? 'var(--primary-color)' : '#cbd5e1', 
+                            borderRadius: '12px', 
+                            position: 'relative',
+                            transition: 'background-color 0.2s',
+                            flexShrink: 0
+                          }}>
+                            <div style={{ 
+                              width: '18px', 
+                              height: '18px', 
+                              backgroundColor: 'white', 
+                              borderRadius: '50%', 
+                              position: 'absolute', 
+                              top: '3px', 
+                              left: isCarryover ? '23px' : '3px',
+                              transition: 'left 0.2s'
+                            }}></div>
+                          </div>
+                        </div>
+
+                        <div className="form-group mb-md" style={{ backgroundColor: 'var(--bg-color)', padding: '12px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                          <label className="form-label" style={{ color: 'var(--primary-color)' }}>
+                            ✨ {currentMonthStr} {isCarryover ? '限定の積立額' : '限定の予算'} (任意)
+                          </label>
+                          <input type="number" inputMode="numeric" className="form-control" value={thisMonthBudget} onChange={e => setThisMonthBudget(e.target.value)} placeholder={isCarryover ? "今月だけ積立額を変える場合" : "今月だけ予算を変える場合"} style={{ borderColor: 'var(--primary-color-light)' }} />
+                          <p className="text-xs text-secondary mt-xs">
+                            {isCarryover 
+                              ? "※未入力の場合は基本の積立額が適用されます。0を入力すると今月は積み立てません。" 
+                              : "※未入力の場合は基本の予算が適用されます。0を入力すると「予算なし」になります。"}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="flex gap-sm">
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>

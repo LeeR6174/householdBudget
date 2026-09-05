@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { db } from '../db/db';
 import { getLocalDateString, getLocalISOString } from '../utils/dateUtils';
+import { formatCurrency } from '../utils/format';
 
 export default function AddTransactionPage() {
   const navigate = useNavigate();
@@ -31,6 +32,10 @@ export default function AddTransactionPage() {
   const handleAddCategorySubmit = async (e) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
+    if (newCatName.trim() === '緊急支出') {
+      alert('「緊急支出」は既に固定枠として登録されています');
+      return;
+    }
 
     try {
       const newId = `cat_custom_${Date.now()}`;
@@ -56,6 +61,23 @@ export default function AddTransactionPage() {
 
   const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))), [type]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const settings = useLiveQuery(() => db.settings.get('master'));
+  const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
+  const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
+  const allTransactions = useLiveQuery(() => db.transactions.toArray()) || [];
+
+  const currentSavings = useMemo(() => {
+    if (!settings) return 0;
+    const initial = settings.targetSavings || 0;
+    const monthly = allMonthlySettings.reduce((sum, s) => sum + (s.targetSavings || 0), 0);
+    const extra = savingsRecords.filter(r => r.type === 'addition').reduce((sum, r) => sum + (r.amount || 0), 0);
+    const dbDep = savingsRecords.filter(r => r.type === 'depletion').reduce((sum, r) => sum + (r.amount || 0), 0);
+    const txDep = allTransactions
+      .filter(t => t.type === 'expense' && t.isSavingsDepletion && (!id || t.id !== id))
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    return Math.max(0, initial + monthly + extra - (dbDep + txDep));
+  }, [settings, allMonthlySettings, savingsRecords, allTransactions, id]);
+
   // Fetch existing transaction if editing
   const existingTx = useLiveQuery(async () => {
     if (!id) return null;
@@ -284,6 +306,26 @@ export default function AddTransactionPage() {
               </div>
             )}
 
+            {/* 貯金切り崩し時の残高表示と超過アラート */}
+            {type === 'expense' && isSavingsDepletion && (
+              <div className="mb-md animate-fade-in" style={{ marginTop: '-6px' }}>
+                <div className="text-[11px] text-secondary flex-between px-xs font-semibold">
+                  <span>現在の貯蓄残高: <strong className="text-primary">{formatCurrency(currentSavings)}</strong></span>
+                </div>
+                {Number(amount) > currentSavings && (
+                  <div className="p-sm mt-xs rounded-xl flex items-start gap-xs animate-fade-in" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>🚨</span>
+                    <div className="text-xs leading-relaxed">
+                      <span className="font-bold text-expense block">貯金残高（{formatCurrency(currentSavings)}）を超過しています</span>
+                      <span className="text-secondary">
+                        貯金で不足する <strong className="text-expense font-bold">{formatCurrency(Number(amount) - currentSavings)}</strong> は、自動的に「緊急支出」として計上され、今月末の予測金に反映されます。
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">使用資産</label>
               <select className="form-control" value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
@@ -309,8 +351,28 @@ export default function AddTransactionPage() {
                 </div>
                 <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required={!isSavingsDepletion}>
                   <option value="" disabled>分類を選択</option>
-                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  {categories.map(cat => {
+                    const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+                    return (
+                      <option key={cat.id} value={cat.id}>
+                        {isEm ? '🚨 ' : ''}{cat.name}{isEm ? '（特別緊急枠）' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {(() => {
+                  const selectedCat = categories.find(c => c.id === categoryId);
+                  const isEmergency = selectedCat?.isEmergency || selectedCat?.isFixed || selectedCat?.name === '緊急支出';
+                  if (!isEmergency) return null;
+                  return (
+                    <div className="p-sm mt-xs rounded-xl flex items-start gap-xs animate-fade-in" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px' }}>
+                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>🚨</span>
+                      <span className="text-xs text-expense font-bold leading-relaxed">
+                        緊急支出は今月の総予算に含まれない特別枠です。突発的・不可避な出費にのみご利用ください。
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </>

@@ -42,9 +42,10 @@ export default function AnalysisPage() {
     const dailyExpenses = {};
     const assetTypeExpenses = { bank: 0, cash: 0, credit: 0 };
     
-    // 固定費・変動費の分類
+    // 固定費・変動費・緊急支出の分類
     let fixedExpense = 0;
     let variableExpense = 0;
+    let emergencyExpense = 0;
     const fixedKeywords = ['家賃', '住宅', '電気', 'ガス', '水道', '通信', '光熱費', '保険', 'サブスク', 'ローン', '学費', '固定費', '定期'];
     const subCategoryIds = subscriptions.map(s => s.categoryId);
 
@@ -69,14 +70,21 @@ export default function AnalysisPage() {
           const asset = assets.find(a => a.id === tx.assetId);
           if (asset) assetTypeExpenses[asset.type] += tx.amount;
 
-          // 固定費 vs 変動費
+          // 固定費 vs 変動費 vs 緊急支出
           const cat = categories.find(c => c.id === tx.categoryId);
-          const isFixed = cat && (
+          const isEmergency = cat && (
+            cat.id === 'cat_special_emergency' ||
+            cat.isEmergency ||
+            cat.name === '緊急支出'
+          );
+          const isFixed = !isEmergency && cat && (
             subCategoryIds.includes(cat.id) ||
             fixedKeywords.some(kw => cat.name.includes(kw))
           );
           
-          if (isFixed) {
+          if (isEmergency) {
+            emergencyExpense += tx.amount;
+          } else if (isFixed) {
             fixedExpense += tx.amount;
           } else {
             variableExpense += tx.amount;
@@ -89,7 +97,7 @@ export default function AnalysisPage() {
 
     return { 
       income, expense, catExpenses, dailyExpenses, assetTypeExpenses, 
-      savingsRate, fixedExpense, variableExpense, daysInMonth 
+      savingsRate, fixedExpense, variableExpense, emergencyExpense, daysInMonth 
     };
   }, [currentMonthTx, startDate, assets, categories, subscriptions]);
 
@@ -105,6 +113,7 @@ export default function AnalysisPage() {
     let income = 0;
     let expense = 0;
     let variableExpense = 0;
+    let emergencyExpense = 0;
     
     const fixedKeywords = ['家賃', '住宅', '電気', 'ガス', '水道', '通信', '光熱費', '保険', 'サブスク', 'ローン', '学費', '固定費', '定期'];
     const subCategoryIds = subscriptions.map(s => s.categoryId);
@@ -116,19 +125,26 @@ export default function AnalysisPage() {
           expense += tx.amount;
           
           const cat = categories.find(c => c.id === tx.categoryId);
-          const isFixed = cat && (
+          const isEmergency = cat && (
+            cat.id === 'cat_special_emergency' ||
+            cat.isEmergency ||
+            cat.name === '緊急支出'
+          );
+          const isFixed = !isEmergency && cat && (
             subCategoryIds.includes(cat.id) ||
             fixedKeywords.some(kw => cat.name.includes(kw))
           );
           
-          if (!isFixed) {
+          if (isEmergency) {
+            emergencyExpense += tx.amount;
+          } else if (!isFixed) {
             variableExpense += tx.amount;
           }
         }
       }
     });
 
-    return { income, expense, variableExpense };
+    return { income, expense, variableExpense, emergencyExpense };
   }, [allRelevantTx, lastMonthStr, categories, subscriptions]);
 
   // 過去平均と比較した「削減ターゲット」自動選出ロジック
@@ -159,7 +175,7 @@ export default function AnalysisPage() {
     let targetCategory = null;
     let avgAmountForTarget = 0;
 
-    categories.filter(c => c.type === 'expense').forEach(cat => {
+    categories.filter(c => c.type === 'expense' && !c.isEmergency && !c.isFixed && c.name !== '緊急支出').forEach(cat => {
       const currentSpent = analytics.catExpenses[cat.id] || 0;
       const average = categoryAverages[cat.id] || 0;
       const overAmount = currentSpent - average;
@@ -252,12 +268,14 @@ export default function AnalysisPage() {
     const data = categories
       .filter(c => c.type === 'expense')
       .map(cat => ({
+        id: cat.id,
         name: cat.name,
         value: analytics.catExpenses[cat.id] || 0,
-        fill: cat.color || '#8884d8'
+        fill: cat.color || '#8884d8',
+        isEmergency: cat.id === 'cat_special_emergency' || cat.name === '緊急支出'
       }));
     if (analytics.catExpenses['uncategorized'] > 0) {
-      data.push({ name: '未分類・不明', value: analytics.catExpenses['uncategorized'], fill: '#9ca3af' });
+      data.push({ id: 'uncategorized', name: '未分類・不明', value: analytics.catExpenses['uncategorized'], fill: '#9ca3af', isEmergency: false });
     }
     return data.filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   }, [categories, analytics.catExpenses]);
@@ -403,6 +421,11 @@ export default function AnalysisPage() {
                   </span>
                 )}
               </div>
+              {analytics.emergencyExpense > 0 && (
+                <div className="text-[10px] font-bold text-rose-500 mt-xs">
+                  (内 緊急 {formatCurrency(analytics.emergencyExpense)})
+                </div>
+              )}
             </div>
           </div>
 
@@ -414,10 +437,16 @@ export default function AnalysisPage() {
             <div className="flex-between text-xs text-secondary mb-xs font-bold">
               <span>固定費 (削りにくい)</span>
               <span>変動費 (自分の努力)</span>
+              {analytics.emergencyExpense > 0 && (
+                <span className="text-rose-500 font-bold">🚨 緊急支出</span>
+              )}
             </div>
             <div className="flex-between text-base font-bold mb-sm">
               <span style={{ color: 'var(--primary-color)' }}>{formatCurrency(analytics.fixedExpense)}</span>
               <span style={{ color: '#ec4899' }}>{formatCurrency(analytics.variableExpense)}</span>
+              {analytics.emergencyExpense > 0 && (
+                <span style={{ color: '#f43f5e' }}>{formatCurrency(analytics.emergencyExpense)}</span>
+              )}
             </div>
             <div className="progress-container" style={{ height: '10px', backgroundColor: 'rgba(0,0,0,0.05)', display: 'flex', overflow: 'hidden' }}>
               <div style={{
@@ -430,10 +459,17 @@ export default function AnalysisPage() {
                 backgroundColor: '#ec4899',
                 height: '100%'
               }}></div>
+              {analytics.emergencyExpense > 0 && (
+                <div style={{
+                  width: `${analytics.expense > 0 ? (analytics.emergencyExpense / analytics.expense) * 100 : 0}%`,
+                  backgroundColor: '#f43f5e',
+                  height: '100%'
+                }}></div>
+              )}
             </div>
             {lastMonthStats.variableExpense > 0 && (
               <div className="text-[10px] text-secondary mt-md font-bold flex items-center justify-between" style={{ opacity: 0.8 }}>
-                <span>努力の成果 (変動費の前月比)</span>
+                <span>努力の成果 (変動費の前月比 ※緊急支出を除く)</span>
                 <span style={{
                   color: analytics.variableExpense <= lastMonthStats.variableExpense ? 'var(--income-color)' : 'var(--expense-color)',
                   fontSize: '11px'
@@ -625,7 +661,7 @@ export default function AnalysisPage() {
                 value={selectedCategoryId}
                 onChange={(e) => setSelectedCategoryId(e.target.value)}
               >
-                {categories.filter(c => c.type === 'expense').map(cat => (
+                {categories.filter(c => c.type === 'expense' && c.id !== 'cat_special_emergency' && !c.isEmergency && c.name !== '緊急支出').map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
@@ -675,7 +711,21 @@ export default function AnalysisPage() {
                         {item.name.slice(0, 4)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm truncate mb-1">{item.name}</div>
+                        <div className="font-bold text-sm truncate mb-1 flex items-center gap-xs">
+                          <span>{item.name}</span>
+                          {item.isEmergency && (
+                            <span style={{
+                              fontSize: '9px',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(244,63,94,0.15)',
+                              color: '#f43f5e',
+                              fontWeight: 800
+                            }}>
+                              🚨 緊急枠
+                            </span>
+                          )}
+                        </div>
                         <div className="progress-container" style={{ height: '6px', backgroundColor: 'rgba(0,0,0,0.03)' }}>
                           <div className="progress-bar" style={{ 
                             width: `${(item.value / analytics.expense) * 100}%`, 

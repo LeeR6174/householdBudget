@@ -119,6 +119,7 @@ export default function BudgetPage() {
       }
 
       for (const cat of categories) {
+        if (cat.isEmergency || cat.isFixed || cat.name === '緊急支出') continue;
         const val = newInputs[cat.id];
         if (val !== '' && !isNaN(Number(val))) {
           await db.monthlyBudgets.add({
@@ -158,6 +159,7 @@ export default function BudgetPage() {
         }
 
         for (const cat of categories) {
+          if (cat.isEmergency || cat.isFixed || cat.name === '緊急支出') continue;
           const val = budgetInputs[cat.id];
           if (val !== '' && val !== undefined && !isNaN(Number(val))) {
             await db.monthlyBudgets.add({
@@ -179,17 +181,21 @@ export default function BudgetPage() {
     }
   };
 
-  // 計算：当月総予算
+  // 計算：当月総予算（緊急支出は除外）
   const totalBudget = useMemo(() => {
-    return Object.values(budgetInputs).reduce((sum, val) => {
-      const num = Number(val);
+    return categories.reduce((sum, cat) => {
+      const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+      if (isEm) return sum;
+      const num = Number(budgetInputs[cat.id]);
       return sum + (isNaN(num) ? 0 : num);
     }, 0);
-  }, [budgetInputs]);
+  }, [categories, budgetInputs]);
 
-  // 計算：前月総予算
+  // 計算：前月総予算（緊急支出は除外）
   const prevTotalBudget = useMemo(() => {
     return categories.reduce((sum, cat) => {
+      const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+      if (isEm) return sum;
       const prevEntry = prevMonthBudgets.find(b => b.categoryId === cat.id);
       const val = prevEntry ? prevEntry.budget : (cat.monthlyLimit || 0);
       return sum + val;
@@ -329,6 +335,7 @@ export default function BudgetPage() {
 
         <div style={{ display: 'grid', gap: '14px' }}>
           {categories.map(cat => {
+            const isEmergency = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
             const val = budgetInputs[cat.id] ?? '';
             const prevEntry = prevMonthBudgets.find(b => b.categoryId === cat.id);
             const prevBudgetAmount = prevEntry ? prevEntry.budget : (cat.monthlyLimit || 0);
@@ -338,10 +345,10 @@ export default function BudgetPage() {
               <div 
                 key={cat.id} 
                 style={{
-                  border: '1px solid var(--border-color)',
+                  border: isEmergency ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-color)',
                   padding: '14px',
                   borderRadius: '18px',
-                  backgroundColor: 'rgba(0,0,0,0.01)',
+                  backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.02)' : 'rgba(0,0,0,0.01)',
                   position: 'relative',
                   overflow: 'hidden'
                 }}
@@ -353,7 +360,7 @@ export default function BudgetPage() {
                   left: 0,
                   bottom: 0,
                   width: '4px',
-                  backgroundColor: cat.color || 'var(--primary-color)'
+                  backgroundColor: isEmergency ? 'var(--expense-color)' : (cat.color || 'var(--primary-color)')
                 }} />
 
                 {/* Header: Category Name & Type */}
@@ -361,6 +368,19 @@ export default function BudgetPage() {
                   <div className="flex-center gap-sm">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || '#333' }} />
                     <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{cat.name}</span>
+                    {isEmergency && (
+                      <span style={{ 
+                        fontSize: '0.65rem', 
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)', 
+                        color: 'var(--expense-color)', 
+                        padding: '1px 6px', 
+                        borderRadius: '9999px',
+                        fontWeight: 'bold',
+                        border: '1px solid rgba(239, 68, 68, 0.3)'
+                      }}>
+                        🚨 特別緊急枠
+                      </span>
+                    )}
                     {cat.isCarryover && (
                       <span style={{ 
                         fontSize: '0.65rem', 
@@ -379,52 +399,66 @@ export default function BudgetPage() {
                   )}
                 </div>
 
-                {/* Input Field */}
-                <div className="flex-center gap-sm" style={{ paddingLeft: '6px' }}>
-                  <span className="font-bold text-sm text-secondary">¥</span>
-                  <input 
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="0"
-                    className="form-control"
-                    style={{ 
-                      padding: '8px 12px', 
-                      fontSize: '16px', 
-                      fontWeight: '800', 
-                      flex: 1,
-                      borderRadius: '12px'
-                    }}
-                    value={val}
-                    onChange={(e) => handleInputChange(cat.id, e.target.value)}
-                  />
-                  <span className="text-xs font-bold text-secondary">円</span>
-                </div>
-
-                {/* Contextual Reference Chips */}
-                <div className="flex items-center gap-sm mt-xs text-xs" style={{ paddingLeft: '6px', flexWrap: 'wrap' }}>
-                  {prevBudgetAmount > 0 && (
-                    <button
-                      type="button"
-                      className="text-[11px] text-secondary font-medium"
-                      style={{
-                        background: 'rgba(0,0,0,0.03)',
-                        border: '1px solid var(--border-color)',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => handleApplySinglePrevBudget(cat.id, prevBudgetAmount)}
-                      title="クリックで先月の予算金額をセット"
-                    >
-                      先月予算: <span className="font-bold text-primary">{formatCurrency(prevBudgetAmount)}</span> ⤺
-                    </button>
-                  )}
-                  {prevSpentAmount > 0 && (
-                    <span className="text-[11px] text-secondary">
-                      先月支出: {formatCurrency(prevSpentAmount)}
+                {/* Input Field or Emergency Notice */}
+                {isEmergency ? (
+                  <div className="flex-between items-center p-sm rounded-xl" style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px dashed rgba(239, 68, 68, 0.3)', marginLeft: '6px', minHeight: '44px' }}>
+                    <span className="text-xs font-bold text-expense flex items-center gap-xs">
+                      <span>🚨</span>
+                      <span>上限なし（今月の総予算に含まれません）</span>
                     </span>
-                  )}
-                </div>
+                    <span className="text-[10px] font-bold text-secondary px-xs py-0.5 rounded" style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}>
+                      設定不要
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-center gap-sm" style={{ paddingLeft: '6px' }}>
+                      <span className="font-bold text-sm text-secondary">¥</span>
+                      <input 
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        className="form-control"
+                        style={{ 
+                          padding: '8px 12px', 
+                          fontSize: '16px', 
+                          fontWeight: '800', 
+                          flex: 1,
+                          borderRadius: '12px'
+                        }}
+                        value={val}
+                        onChange={(e) => handleInputChange(cat.id, e.target.value)}
+                      />
+                      <span className="text-xs font-bold text-secondary">円</span>
+                    </div>
+
+                    {/* Contextual Reference Chips */}
+                    <div className="flex items-center gap-sm mt-xs text-xs" style={{ paddingLeft: '6px', flexWrap: 'wrap' }}>
+                      {prevBudgetAmount > 0 && (
+                        <button
+                          type="button"
+                          className="text-[11px] text-secondary font-medium"
+                          style={{
+                            background: 'rgba(0,0,0,0.03)',
+                            border: '1px solid var(--border-color)',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => handleApplySinglePrevBudget(cat.id, prevBudgetAmount)}
+                          title="クリックで先月の予算金額をセット"
+                        >
+                          先月予算: <span className="font-bold text-primary">{formatCurrency(prevBudgetAmount)}</span> ⤺
+                        </button>
+                      )}
+                      {prevSpentAmount > 0 && (
+                        <span className="text-[11px] text-secondary">
+                          先月支出: {formatCurrency(prevSpentAmount)}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}

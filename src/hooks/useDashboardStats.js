@@ -70,7 +70,13 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       .filter(r => r.type === 'addition' && r.month <= currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
 
-    const totalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
+    // 貯金原資の総額（切り崩し前）
+    const totalSavingsBeforeDepletions = initialSavings + monthlyAdditions + extraAdditions;
+    const rawTotalSavings = totalSavingsBeforeDepletions - totalDepletions;
+    const totalSavings = Math.max(0, rawTotalSavings);
+    
+    // 貯金残高を超過して支払われた金額（貯金で賄えなかった不足分）
+    const savingsOverflow = rawTotalSavings < 0 ? Math.abs(rawTotalSavings) : 0;
 
     // 当月の動きの計算
     const currentMonthTargetSavings = allMonthlySettings.find(s => s.month === currentMonth)?.targetSavings || 0;
@@ -90,14 +96,36 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     // 4. 今月の収支計算
     let income = 0;
     let expense = 0;
+    let normalExpense = 0;
+    let emergencyExpense = 0;
     const expenseByCategory = {};
+
+    // 貯金超過分があれば、それはフリー資金からの持ち出し＝緊急支出として計上
+    if (savingsOverflow > 0) {
+      emergencyExpense += savingsOverflow;
+      expense += savingsOverflow;
+    }
+
+    const emergencyCatIds = new Set(
+      categories
+        .filter(c => c.isEmergency || c.isFixed || c.name === '緊急支出')
+        .map(c => c.id)
+    );
+    emergencyCatIds.add('cat_special_emergency');
     
     currentMonthTx.forEach(t => {
       if (t.type === 'income') income += t.amount;
       if (t.type === 'expense') {
         if (!t.isSavingsDepletion) {
           expense += t.amount;
-          expenseByCategory[t.categoryId || 'uncategorized'] = (expenseByCategory[t.categoryId || 'uncategorized'] || 0) + t.amount;
+          const catId = t.categoryId || 'uncategorized';
+          expenseByCategory[catId] = (expenseByCategory[catId] || 0) + t.amount;
+
+          if (emergencyCatIds.has(catId)) {
+            emergencyExpense += t.amount;
+          } else {
+            normalExpense += t.amount;
+          }
         }
       }
     });
@@ -123,27 +151,37 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     let totalNormalExpense = 0;
 
     const categoryStats = categories.filter(c => c.type === 'expense').map(cat => {
+      const isEmergency = emergencyCatIds.has(cat.id) || cat.isEmergency || cat.name === '緊急支出';
       const spent = expenseByCategory[cat.id] || 0;
       const catTxs = txByCategory[cat.id] || [];
       const catBudgets = budgetsByCat[cat.id] || [];
 
-      const limit = cat.isCarryover 
-        ? calculateCarryoverBalance(cat, currentMonth, catTxs, catBudgets) + spent
-        : (budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0));
-      
-      totalBudget += limit;
-
-      if (!cat.isCarryover) {
-        totalNormalBudget += limit;
-        totalNormalExpense += spent;
+      let limit = 0;
+      if (isEmergency) {
+        limit = 0; // 緊急支出は上限なし（総予算対象外）
+      } else if (cat.isCarryover) {
+        limit = calculateCarryoverBalance(cat, currentMonth, catTxs, catBudgets) + spent;
       } else {
-        const monthlyAddition = catBudgets.find(b => b.month === currentMonth)?.budget ?? (cat.monthlyLimit || 0);
-        totalNormalBudget += monthlyAddition;
-        totalNormalExpense += monthlyAddition;
+        limit = budgetMap[cat.id] !== undefined ? budgetMap[cat.id] : (cat.monthlyLimit || 0);
+      }
+      
+      // 緊急支出は今月の総予算に含めない
+      if (!isEmergency) {
+        totalBudget += limit;
+
+        if (!cat.isCarryover) {
+          totalNormalBudget += limit;
+          totalNormalExpense += spent;
+        } else {
+          const monthlyAddition = catBudgets.find(b => b.month === currentMonth)?.budget ?? (cat.monthlyLimit || 0);
+          totalNormalBudget += monthlyAddition;
+          totalNormalExpense += monthlyAddition;
+        }
       }
 
       return {
         ...cat,
+        isEmergency,
         spent,
         limit
       };
@@ -156,12 +194,16 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     // 1. 実質残高（現在のフリー資金：手元資金 - カード未払総額 - 貯金総額）
     const realNetBalance = realBalance + creditBalance - totalSavings;
 
-    // 2. 残り予算の計算
-    const remainingBudget = totalBudget - expense;
+    // 2. 残り予算の計算（緊急支出は総予算外のため、通常支出ベースで残り予算を算出）
+    const remainingBudget = totalBudget - normalExpense;
     const effectiveRemainingBudget = Math.max(0, remainingBudget);
 
-    // 3. 今月末での予測金（実質残高 - 残り予算）
-    const projectedMonthEndBalance = realNetBalance - effectiveRemainingBudget;
+    // 3. 今月末での予測金
+    // A. 緊急支出差引後の予測金（実質残高 - 残り通常予算）
+    const projectedMonthEndBalanceWithEmergency = realNetBalance - effectiveRemainingBudget;
+
+    // B. 通常予算ベースの予測金（緊急支出がなかった場合の着地予測）
+    const projectedMonthEndBalance = projectedMonthEndBalanceWithEmergency + emergencyExpense;
 
     // 後方互換性のための netWorth
     const netWorth = realNetBalance;
@@ -188,9 +230,12 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       remainingBudget,
       realNetBalance,
       projectedMonthEndBalance,
+      projectedMonthEndBalanceWithEmergency,
       netWorth,
       income,
       expense,
+      normalExpense,
+      emergencyExpense,
       totalBudget,
       recentTransactions,
       categoryStats,
