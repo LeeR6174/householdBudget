@@ -33,7 +33,24 @@ db.version(8).stores({
   notifications: '++id, day, message, lastProcessedMonth'
 });
 
-const DEFAULT_CATEGORIES = [];
+export const EMERGENCY_CATEGORY_ID = 'cat_special_emergency';
+
+export const EMERGENCY_CATEGORY = {
+  id: EMERGENCY_CATEGORY_ID,
+  name: '緊急支出',
+  type: 'expense',
+  color: '#ef4444',
+  monthlyLimit: 0,
+  isCarryover: false,
+  isEmergency: true,
+  isFixed: true,
+  description: '総予算外の緊急枠（医療費・緊急修繕など突発的な出費）',
+  sortOrder: 9999
+};
+
+const DEFAULT_CATEGORIES = [
+  EMERGENCY_CATEGORY
+];
 
 const DEFAULT_ASSETS = [
   { id: 'asset_bank_1', name: '銀行', type: 'bank', initialBalance: 0 },
@@ -52,6 +69,24 @@ export const initDB = async () => {
   const categoriesCount = await db.categories.count();
   if (categoriesCount === 0 && DEFAULT_CATEGORIES.length > 0) {
     await db.categories.bulkAdd(DEFAULT_CATEGORIES);
+  }
+
+  // 緊急支出カテゴリの存在保証（既存DBへのマイグレーション）
+  try {
+    const allCategories = await db.categories.toArray();
+    const emergencyCat = allCategories.find(c => c.id === EMERGENCY_CATEGORY_ID || c.isEmergency || c.name === '緊急支出');
+    if (!emergencyCat) {
+      await db.categories.add(EMERGENCY_CATEGORY);
+    } else {
+      await db.categories.update(emergencyCat.id, {
+        name: '緊急支出',
+        isEmergency: true,
+        isFixed: true,
+        monthlyLimit: 0
+      });
+    }
+  } catch (e) {
+    console.error('Failed to ensure emergency category:', e);
   }
 
   const assetsCount = await db.assets.count();

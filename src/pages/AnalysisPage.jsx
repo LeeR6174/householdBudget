@@ -159,7 +159,7 @@ export default function AnalysisPage() {
     let targetCategory = null;
     let avgAmountForTarget = 0;
 
-    categories.filter(c => c.type === 'expense').forEach(cat => {
+    categories.filter(c => c.type === 'expense' && !c.isEmergency && !c.isFixed && c.name !== '緊急支出').forEach(cat => {
       const currentSpent = analytics.catExpenses[cat.id] || 0;
       const average = categoryAverages[cat.id] || 0;
       const overAmount = currentSpent - average;

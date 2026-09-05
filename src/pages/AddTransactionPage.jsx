@@ -31,6 +31,10 @@ export default function AddTransactionPage() {
   const handleAddCategorySubmit = async (e) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
+    if (newCatName.trim() === '緊急支出') {
+      alert('「緊急支出」は既に固定枠として登録されています');
+      return;
+    }
 
     try {
       const newId = `cat_custom_${Date.now()}`;
@@ -309,8 +313,28 @@ export default function AddTransactionPage() {
                 </div>
                 <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required={!isSavingsDepletion}>
                   <option value="" disabled>分類を選択</option>
-                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  {categories.map(cat => {
+                    const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+                    return (
+                      <option key={cat.id} value={cat.id}>
+                        {isEm ? '🚨 ' : ''}{cat.name}{isEm ? '（特別緊急枠）' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {(() => {
+                  const selectedCat = categories.find(c => c.id === categoryId);
+                  const isEmergency = selectedCat?.isEmergency || selectedCat?.isFixed || selectedCat?.name === '緊急支出';
+                  if (!isEmergency) return null;
+                  return (
+                    <div className="p-sm mt-xs rounded-xl flex items-start gap-xs animate-fade-in" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px' }}>
+                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>🚨</span>
+                      <span className="text-xs text-expense font-bold leading-relaxed">
+                        緊急支出は今月の総予算に含まれない特別枠です。突発的・不可避な出費にのみご利用ください。
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </>
