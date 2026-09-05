@@ -7,7 +7,12 @@ import { db } from '../db/db';
 export default function SubscriptionsPage() {
   const navigate = useNavigate();
   const subscriptions = useLiveQuery(() => db.subscriptions.toArray()) || [];
-  const categories = useLiveQuery(() => db.categories.where('type').equals('expense').toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
+  const categories = useLiveQuery(() => 
+    db.categories
+      .where('type').equals('expense')
+      .toArray()
+      .then(cats => cats.filter(c => !c.isEmergency && !c.isFixed && c.name !== '緊急支出').sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))
+  ) || [];
   const assets = useLiveQuery(() => db.assets.where('type').equals('credit').toArray()) || []; // クレジットカード限定
   
   const [isEditing, setIsEditing] = useState(false);

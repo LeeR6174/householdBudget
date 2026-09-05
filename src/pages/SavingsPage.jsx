@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Plus, History, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Plus, History, AlertCircle, Save, Sparkles, Check } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip 
 } from 'recharts';
@@ -21,6 +21,19 @@ export default function SavingsPage() {
   
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+
+  // 毎月の貯金目標額のState
+  const currentMonthlySetting = allMonthlySettings.find(s => s.month === currentMonthStr);
+  const [targetMonthlySavings, setTargetMonthlySavings] = useState('');
+  const [isSavedTarget, setIsSavedTarget] = useState(false);
+
+  useEffect(() => {
+    if (currentMonthlySetting?.targetSavings !== undefined) {
+      setTargetMonthlySavings(currentMonthlySetting.targetSavings.toString());
+    } else {
+      setTargetMonthlySavings('');
+    }
+  }, [currentMonthlySetting]);
 
   // 1. 今月の貯金総額等の集計
   const initialSavings = settings?.targetSavings || 0;
@@ -139,6 +152,25 @@ export default function SavingsPage() {
     setNote('');
   };
 
+  const handleSaveMonthlyTarget = async (e) => {
+    e.preventDefault();
+    const num = Number(targetMonthlySavings);
+    if (isNaN(num) || num < 0) return alert('正しい金額を入力してください');
+
+    try {
+      await db.monthlySettings.put({
+        month: currentMonthStr,
+        targetSavings: num
+      });
+      setIsSavedTarget(true);
+      setTimeout(() => setIsSavedTarget(false), 2500);
+      alert(`📅 ${currentMonthStr} の貯金積立目標額を ${formatCurrency(num)} に設定しました！`);
+    } catch (err) {
+      console.error(err);
+      alert('保存に失敗しました');
+    }
+  };
+
   const handleDeleteRecord = async (item) => {
     if (window.confirm('この記録を削除しますか？')) {
       if (item.isTx) {
@@ -218,6 +250,52 @@ export default function SavingsPage() {
             <div className="font-bold text-sm" style={{ color: '#fca5a5' }}>-{formatCurrency(totalDepletions)}</div>
           </div>
         </div>
+      </div>
+
+      {/* 📅 毎月の貯金積立目標 設定カード */}
+      <div className="card mb-lg" style={{ padding: '20px', border: '1px solid var(--border-color)', borderRadius: '20px' }}>
+        <div className="flex-between items-center mb-xs">
+          <h3 className="font-bold text-sm text-primary flex items-center gap-xs" style={{ margin: 0 }}>
+            <Sparkles size={16} />
+            <span>{currentMonthStr} の貯金積立目標</span>
+          </h3>
+          <span className="text-xs text-secondary font-bold">
+            現在: <span className="text-primary font-bold">{formatCurrency(currentMonthlySetting?.targetSavings || 0)}</span>
+          </span>
+        </div>
+        <p className="text-xs text-secondary mb-md leading-relaxed">
+          毎月いくら貯蓄に回すかを設定します。設定した金額は手元資金から差し引かれ、当月の貯金に自動計上されます。
+        </p>
+        <form onSubmit={handleSaveMonthlyTarget} className="flex gap-sm items-center">
+          <div className="flex-1 flex-center">
+            <span className="text-sm font-bold text-secondary mr-xs">¥</span>
+            <input 
+              type="number" 
+              inputMode="numeric"
+              className="form-control"
+              placeholder="例: 30000"
+              value={targetMonthlySavings}
+              onChange={(e) => setTargetMonthlySavings(e.target.value)}
+              style={{ fontWeight: 'bold', fontSize: '1rem', borderRadius: '12px' }}
+            />
+            <span className="ml-xs font-bold text-sm text-secondary">円</span>
+          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary flex-center gap-xs" 
+            style={{ 
+              height: '46px', 
+              padding: '0 18px', 
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              fontSize: '0.85rem',
+              flexShrink: 0
+            }}
+          >
+            {isSavedTarget ? <Check size={16} /> : <Save size={16} />}
+            <span>{isSavedTarget ? '保存完了' : '設定する'}</span>
+          </button>
+        </form>
       </div>
 
       {/* 📈 貯蓄推移グラフ */}

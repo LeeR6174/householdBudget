@@ -70,7 +70,13 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       .filter(r => r.type === 'addition' && r.month <= currentMonth)
       .reduce((sum, r) => sum + (r.amount || 0), 0);
 
-    const totalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
+    // 貯金原資の総額（切り崩し前）
+    const totalSavingsBeforeDepletions = initialSavings + monthlyAdditions + extraAdditions;
+    const rawTotalSavings = totalSavingsBeforeDepletions - totalDepletions;
+    const totalSavings = Math.max(0, rawTotalSavings);
+    
+    // 貯金残高を超過して支払われた金額（貯金で賄えなかった不足分）
+    const savingsOverflow = rawTotalSavings < 0 ? Math.abs(rawTotalSavings) : 0;
 
     // 当月の動きの計算
     const currentMonthTargetSavings = allMonthlySettings.find(s => s.month === currentMonth)?.targetSavings || 0;
@@ -93,6 +99,12 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     let normalExpense = 0;
     let emergencyExpense = 0;
     const expenseByCategory = {};
+
+    // 貯金超過分があれば、それはフリー資金からの持ち出し＝緊急支出として計上
+    if (savingsOverflow > 0) {
+      emergencyExpense += savingsOverflow;
+      expense += savingsOverflow;
+    }
 
     const emergencyCatIds = new Set(
       categories
