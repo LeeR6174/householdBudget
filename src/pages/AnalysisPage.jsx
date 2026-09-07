@@ -9,6 +9,7 @@ import { getCurrentBudgetMonth, getMonthRange, getLocalDateString } from '../uti
 import { formatCurrency } from '../utils/format';
 import MonthSelector from '../components/MonthSelector';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, HelpCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { isSettledReimbursement } from '../utils/transactionUtils';
 
 export default function AnalysisPage() {
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
@@ -56,7 +57,7 @@ export default function AnalysisPage() {
     currentMonthTx.forEach(tx => {
       if (tx.type === 'income') income += tx.amount;
       if (tx.type === 'expense') {
-        if (!tx.isSavingsDepletion) {
+        if (!tx.isSavingsDepletion && !isSettledReimbursement(tx)) {
           expense += tx.amount;
           
           // カテゴリ別
@@ -121,7 +122,7 @@ export default function AnalysisPage() {
     lastMonthTx.forEach(tx => {
       if (tx.type === 'income') income += tx.amount;
       if (tx.type === 'expense') {
-        if (!tx.isSavingsDepletion) {
+        if (!tx.isSavingsDepletion && !isSettledReimbursement(tx)) {
           expense += tx.amount;
           
           const cat = categories.find(c => c.id === tx.categoryId);
@@ -163,7 +164,8 @@ export default function AnalysisPage() {
       const pastTx = allRelevantTx.filter(tx => 
         tx.categoryId === cat.id && 
         tx.type === 'expense' && 
-        !tx.isSavingsDepletion && 
+        !tx.isSavingsDepletion &&
+        !isSettledReimbursement(tx) &&
         pastMonths.some(m => tx.date.startsWith(m))
       );
       
@@ -236,7 +238,8 @@ export default function AnalysisPage() {
         tx.date.startsWith(m) && 
         tx.categoryId === selectedCategoryId && 
         tx.type === 'expense' &&
-        !tx.isSavingsDepletion
+        !tx.isSavingsDepletion &&
+        !isSettledReimbursement(tx)
       );
       const amount = monthTx.reduce((sum, t) => sum + t.amount, 0);
       return {
@@ -258,7 +261,7 @@ export default function AnalysisPage() {
     return months.map(m => {
       const monthTx = allRelevantTx.filter(tx => tx.date.startsWith(m));
       const inc = monthTx.filter(tx => tx.type === 'income').reduce((s, t) => s + t.amount, 0);
-      const exp = monthTx.filter(tx => tx.type === 'expense' && !tx.isSavingsDepletion).reduce((s, t) => s + t.amount, 0);
+      const exp = monthTx.filter(tx => tx.type === 'expense' && !tx.isSavingsDepletion && !isSettledReimbursement(tx)).reduce((s, t) => s + t.amount, 0);
       return { name: m.split('-')[1] + '月', income: inc, expense: exp };
     });
   }, [allRelevantTx, startDate]);

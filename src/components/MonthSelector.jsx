@@ -8,9 +8,9 @@ export default function MonthSelector({ currentMonth, onChange }) {
   const displayYearMonth = `${yearStr}年${parseInt(monthStr, 10)}月分`;
 
   return (
-    <div className="flex-between card" style={{ padding: '12px 16px', marginBottom: '16px' }}>
+    <div className="month-selector flex-between card" style={{ padding: '12px 16px', marginBottom: '16px' }}>
       <button 
-        className="btn btn-outline"
+        className="month-selector-button btn btn-outline"
         style={{ padding: '8px', border: 'none' }}
         onClick={() => onChange(getPrevMonth(currentMonth))}
       >
@@ -25,7 +25,7 @@ export default function MonthSelector({ currentMonth, onChange }) {
       </div>
 
       <button 
-        className="btn btn-outline"
+        className="month-selector-button btn btn-outline"
         style={{ padding: '8px', border: 'none' }}
         onClick={() => onChange(getNextMonth(currentMonth))}
       >

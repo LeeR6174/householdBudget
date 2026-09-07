@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { calculateCarryoverBalance } from '../utils/budgetUtils';
 import { getLocalDateString, getBudgetMonth } from '../utils/dateUtils';
+import { isSettledReimbursement } from '../utils/transactionUtils';
 
 export function useDashboardStats(currentMonth, startDate, endDate) {
   return useLiveQuery(async () => {
@@ -37,7 +38,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       if (t.date && t.date <= todayStr) {
         if (t.type === 'income') {
           if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] += t.amount;
-        } else if (t.type === 'expense') {
+        } else if (t.type === 'expense' && !isSettledReimbursement(t)) {
           if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
         } else if (t.type === 'transfer') {
           if (assetBalances[t.fromAssetId] !== undefined) assetBalances[t.fromAssetId] -= t.amount;
@@ -116,7 +117,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     currentMonthTx.forEach(t => {
       if (t.type === 'income') income += t.amount;
       if (t.type === 'expense') {
-        if (!t.isSavingsDepletion) {
+        if (!t.isSavingsDepletion && !isSettledReimbursement(t)) {
           expense += t.amount;
           const catId = t.categoryId || 'uncategorized';
           expenseByCategory[catId] = (expenseByCategory[catId] || 0) + t.amount;
@@ -136,8 +137,10 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
 
     const txByCategory = {};
     allTx.forEach(t => {
-      if (!txByCategory[t.categoryId]) txByCategory[t.categoryId] = [];
-      txByCategory[t.categoryId].push(t);
+      if (!isSettledReimbursement(t)) {
+        if (!txByCategory[t.categoryId]) txByCategory[t.categoryId] = [];
+        txByCategory[t.categoryId].push(t);
+      }
     });
     
     const budgetsByCat = {};

@@ -11,7 +11,7 @@ export default function CategoriesPage() {
   const formRef = useRef(null);
   const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -68,6 +68,20 @@ export default function CategoriesPage() {
     setSearchParams({}, { replace: true });
   };
 
+  const openCreateModal = () => {
+    setEditId(null);
+    setName('');
+    setType('expense');
+    setColor('#9ca3af');
+    setMonthlyLimit('');
+    setThisMonthBudget('');
+    setIsCarryover(false);
+    setDescription('');
+    setIsEditing(false);
+    setSearchParams({}, { replace: true });
+    setShowModal(true);
+  };
+
   const handleEdit = (cat) => {
     setEditId(cat.id);
     setName(cat.name);
@@ -122,12 +136,12 @@ export default function CategoriesPage() {
     e.preventDefault();
     if (!name.trim()) return alert('カテゴリ名を入力してください');
 
-    if (!editId && name.trim() === '緊急支出') {
-      return alert('「緊急支出」は既に固定枠として登録されています');
-    }
-
     const oldCat = editId ? categories.find(c => c.id === editId) : null;
     const isEmergency = oldCat?.isEmergency || oldCat?.isFixed || oldCat?.name === '緊急支出';
+
+    if (name.trim() === '緊急支出' && !isEmergency) {
+      return alert('「緊急支出」は既に固定枠として登録されています');
+    }
 
     const catData = {
       name: isEmergency ? '緊急支出' : name.trim(),
@@ -259,8 +273,9 @@ export default function CategoriesPage() {
               >
                 <ChevronDown size={18} />
               </button>
-              <button onClick={() => handleEdit(cat)} className="btn-icon" title="編集">
+              <button onClick={() => handleEdit(cat)} className="btn-icon category-edit-button" title="編集" aria-label="カテゴリを編集">
                 <Edit2 size={18} />
+                <span>編集</span>
               </button>
               {isEmergency ? (
                 <div 
@@ -296,6 +311,7 @@ export default function CategoriesPage() {
       {/* ＋ 新規カテゴリを追加ボタン */}
       <div className="mb-lg">
         <button 
+          type="button"
           className="btn btn-primary w-full flex-center gap-xs" 
           style={{ 
             height: '48px', 
@@ -304,10 +320,7 @@ export default function CategoriesPage() {
             borderRadius: '16px', 
             boxShadow: 'var(--shadow-md)' 
           }}
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
+          onClick={openCreateModal}
         >
           <Plus size={20} />
           <span>新規カテゴリを追加</span>
