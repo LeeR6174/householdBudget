@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Plus, SlidersHorizontal, Sparkles, Scale } from 'lucide-react';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth, getMonthRange, getLocalDateString } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import TransactionItem from '../components/TransactionItem';
@@ -19,37 +19,11 @@ export default function HomePage() {
   const stats = useDashboardStats(currentMonth, startDate, endDate);
   
   // 照合モーダルの状態管理
-  const masterSettings = useLiveQuery(() => db.settings.get('master'));
   const [showReconcileModal, setShowReconcileModal] = useState(false);
-  const [skipReconciliation, setSkipReconciliation] = useState(
-    sessionStorage.getItem('skipReconciliation') === 'true'
-  );
 
-  useEffect(() => {
-    if (stats?.isLoaded && masterSettings && !skipReconciliation) {
-      const lastDateStr = masterSettings.lastReconciliationDate;
-      let shouldShow = false;
-      
-      if (!lastDateStr) {
-        shouldShow = true;
-      } else {
-        const lastDate = new Date(lastDateStr);
-        const today = new Date(getLocalDateString());
-        const diffTime = Math.abs(today - lastDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        shouldShow = diffDays >= 7;
-      }
-
-      if (shouldShow) {
-        setShowReconcileModal(true);
-      }
-    }
-  }, [stats?.isLoaded, masterSettings, skipReconciliation]);
-
-  const handleSkipReconciliation = () => {
-    sessionStorage.setItem('skipReconciliation', 'true');
-    setSkipReconciliation(true);
-    setShowReconcileModal(false);
+  const handleSettleReimbursement = async (transaction) => {
+    if (!window.confirm('返金を確認し、この立替支出を家計簿の集計から外しますか？')) return;
+    await db.transactions.update(transaction.id, { reimbursementStatus: 'settled' });
   };
   
   if (!stats) {
@@ -90,7 +64,13 @@ export default function HomePage() {
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
-      <div className="page-title">ホーム</div>
+      <div className="page-header-row">
+        <div className="page-title">ホーム</div>
+        <button className="header-action-button" type="button" onClick={() => setShowReconcileModal(true)} title="残高照合">
+          <Scale size={19} />
+          <span>残高照合</span>
+        </button>
+      </div>
 
       {/* 初期設定案内バナー */}
       {assets.length === 0 && (
@@ -358,7 +338,7 @@ export default function HomePage() {
             limit={catStat.limit}
             isCarryover={catStat.isCarryover}
             isEmergency={catStat.isEmergency}
-            onClick={() => navigate(`/budget?month=${currentMonth}`)}
+            onClick={() => navigate(`/history?categoryId=${encodeURIComponent(catStat.id)}`)}
           />
         ))}
         
@@ -368,7 +348,7 @@ export default function HomePage() {
             category={{ name: '未分類・不明', color: '#9ca3af', type: 'expense' }} 
             spent={uncategorizedExpense} 
             limit={0}
-            onClick={() => navigate('/settings/categories')}
+            onClick={() => navigate('/history?categoryId=uncategorized')}
           />
         )}
 
@@ -404,6 +384,7 @@ export default function HomePage() {
             categories={categories} 
             assets={assets} 
             onClick={() => navigate(`/edit/${tx.id}`)}
+            onSettle={handleSettleReimbursement}
           />
         ))}
         {recentTransactions.length === 0 && (
@@ -418,7 +399,7 @@ export default function HomePage() {
       {/* 残高照合モーダル */}
       <ReconciliationModal 
         isOpen={showReconcileModal} 
-        onClose={handleSkipReconciliation} 
+        onClose={() => setShowReconcileModal(false)}
         onComplete={() => setShowReconcileModal(false)} 
       />
     </div>

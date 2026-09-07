@@ -1,46 +1,20 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Trash2, Bell, Scale } from 'lucide-react';
+import { Scale } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db, resetDB } from '../db/db';
-import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '../utils/dateUtils';
-import { formatCurrency } from '../utils/format';
+import { getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import ReconciliationModal from '../components/ReconciliationModal';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const backupInputRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('data'); // 'data' or 'notifications'
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReconcileModal, setShowReconcileModal] = useState(false);
 
-  // Notification form state
-  const [notifyDay, setNotifyDay] = useState(1);
-  const [notifyMessage, setNotifyMessage] = useState('');
-
   const settings = useLiveQuery(() => db.settings.get('master'));
-  const assets = useLiveQuery(() => db.assets.toArray()) || [];
-  const notifications = useLiveQuery(() => db.notifications.toArray()) || [];
-  const currentMonthStr = getCurrentBudgetMonth();
-  
-  const handleAddNotification = async (e) => {
-    e.preventDefault();
-    if (!notifyMessage.trim()) return;
-    await db.notifications.add({
-      day: Number(notifyDay),
-      message: notifyMessage.trim(),
-      lastProcessedMonth: ''
-    });
-    setNotifyMessage('');
-  };
-
-  const handleDeleteNotification = async (id) => {
-    if (window.confirm('この通知を削除しますか？')) {
-      await db.notifications.delete(id);
-    }
-  };
 
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
@@ -117,7 +91,7 @@ export default function SettingsPage() {
         return newId;
       };
 
-      const getOrCreateCategory = (nameStr, type) => {
+      const getOrCreateCategory = (nameStr) => {
         if (!nameStr) return null;
         if (catMap.has(nameStr)) return catMap.get(nameStr);
         const newId = `cat_a${Date.now()}_${Math.floor(Math.random()*1000)}`;
@@ -280,42 +254,12 @@ export default function SettingsPage() {
     reader.readAsText(file);
   };
 
-  const handleTestNotification = async () => {
-    if (!('Notification' in window)) return alert('未対応ブラウザ');
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const registration = await navigator.serviceWorker.ready;
-      registration.showNotification('格が違う家計簿', {
-        body: 'テスト通知成功！✨',
-        icon: '/favicon.png',
-        badge: '/pwa-192x192.png',
-        silent: true
-      });
-    }
-  };
 
   return (
-    <div className="page-container" style={{ paddingBottom: '100px' }}>
+    <div className="page-container settings-page" style={{ paddingBottom: '100px' }}>
       <div className="page-title">設定</div>
 
-      {/* Tabs */}
-      <div className="toggle-group mb-lg">
-        <button 
-          className={`toggle-btn ${activeTab === 'data' ? 'active expense' : ''}`}
-          onClick={() => setActiveTab('data')}
-        >
-          データ管理
-        </button>
-        <button 
-          className={`toggle-btn ${activeTab === 'notifications' ? 'active expense' : ''}`}
-          onClick={() => setActiveTab('notifications')}
-        >
-          通知設定
-        </button>
-      </div>
-
-      {activeTab === 'data' ? (
-        <>
+      <>
           {/* ⚖️ いつでも残高照合カード */}
           <div className="card mb-lg" style={{ 
             background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.06) 0%, rgba(59, 130, 246, 0.06) 100%)',
@@ -346,6 +290,9 @@ export default function SettingsPage() {
 
           <div className="card mb-lg">
             <h3 className="font-bold mb-md">マスターデータ管理</h3>
+            <div className="form-group mb-md">
+              <button className="btn btn-primary w-full" onClick={() => navigate('/settings/month-start')}>月初めセッティング</button>
+            </div>
             <div className="form-group mb-md">
               <button className="btn btn-primary w-full" onClick={() => navigate('/settings/categories')}>カテゴリ管理</button>
             </div>
@@ -378,68 +325,7 @@ export default function SettingsPage() {
             <h3 className="font-bold mb-md text-danger-color">危険な操作</h3>
             <button className="btn btn-danger w-full" onClick={handleReset}>データを初期化する</button>
           </div>
-        </>
-      ) : (
-        <>
-          <div className="card mb-lg">
-            <h3 className="font-bold mb-md">毎月のリマインド設定</h3>
-            <p className="text-sm text-secondary mb-md">指定した日にちに、アプリからリマインド通知を送ります。</p>
-            
-            <form onSubmit={handleAddNotification} className="mb-lg p-md" style={{ backgroundColor: 'var(--bg-color)', borderRadius: '16px' }}>
-              <div className="form-group">
-                <label className="form-label">通知する日 (毎月)</label>
-                <div className="flex items-center gap-sm">
-                  <input 
-                    type="number" 
-                    min="1" 
-                    max="31" 
-                    className="form-control" 
-                    style={{ width: '80px' }} 
-                    value={notifyDay} 
-                    onChange={e => setNotifyDay(e.target.value)} 
-                  />
-                  <span>日</span>
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">通知メッセージ</label>
-                <textarea 
-                  className="form-control" 
-                  rows="2" 
-                  value={notifyMessage} 
-                  onChange={e => setNotifyMessage(e.target.value)} 
-                  placeholder="例: クレジットカードの明細を確認しましょう！"
-                />
-              </div>
-              <button type="submit" className="btn btn-primary w-full">通知を追加</button>
-            </form>
-
-            <div className="mt-md">
-              <h4 className="font-bold text-sm text-secondary mb-sm">設定済みの通知</h4>
-              {notifications.map(n => (
-                <div key={n.id} className="list-item">
-                  <div className="flex-1">
-                    <div className="font-bold text-primary">毎月 {n.day} 日</div>
-                    <div className="text-sm">{n.message}</div>
-                  </div>
-                  <button className="btn-icon text-danger" onClick={() => handleDeleteNotification(n.id)}>
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ))}
-              {notifications.length === 0 && <p className="text-sm text-secondary text-center py-lg">通知設定はありません</p>}
-            </div>
-          </div>
-
-          <div className="card">
-            <h3 className="font-bold mb-md">動作確認</h3>
-            <button className="btn btn-outline w-full mb-lg font-bold" onClick={handleTestNotification}>
-              🔔 今すぐ通知テストを実行
-            </button>
-            <p className="text-xs text-secondary text-center">※通知が届かない場合は、端末の設定で通知が許可されているか確認してください。</p>
-          </div>
-        </>
-      )}
+      </>
 
       <div className="card mt-lg">
         <h3 className="font-bold mb-md">お問い合わせ・フィードバック</h3>

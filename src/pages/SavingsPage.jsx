@@ -7,11 +7,12 @@ import {
 } from 'recharts';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
-import { getCurrentBudgetMonth, getLocalDateString, getBudgetMonth } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getLocalDateString, getBudgetMonth, getPrevMonth, getNextMonth } from '../utils/dateUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
   const currentMonthStr = getCurrentBudgetMonth();
+  const [targetMonth, setTargetMonth] = useState(currentMonthStr);
   
   const settings = useLiveQuery(() => db.settings.get('master'));
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
@@ -22,8 +23,8 @@ export default function SavingsPage() {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
 
-  // 毎月の貯金目標額のState
-  const currentMonthlySetting = allMonthlySettings.find(s => s.month === currentMonthStr);
+  // 月別の貯金積立額
+  const currentMonthlySetting = allMonthlySettings.find(s => s.month === targetMonth);
   const [targetMonthlySavings, setTargetMonthlySavings] = useState('');
   const [isSavedTarget, setIsSavedTarget] = useState(false);
 
@@ -55,17 +56,26 @@ export default function SavingsPage() {
     .filter(r => r.type === 'addition' && r.month <= currentMonthStr)
     .reduce((sum, r) => sum + (r.amount || 0), 0);
 
-  const currentTotalSavings = initialSavings + monthlyAdditions + extraAdditions - totalDepletions;
+  const currentTotalSavings = Math.max(0, initialSavings + monthlyAdditions + extraAdditions - totalDepletions);
 
-  // 2. 過去6ヶ月の月末時点での貯金総額の推移データ作成
+  const previousTargetMonth = getPrevMonth(targetMonth);
+  const previousMonthlySetting = allMonthlySettings.find(s => s.month === previousTargetMonth);
+  const targetMonthLabel = `${parseInt(targetMonth.split('-')[1], 10)}月分`;
+
+  const handleApplyPreviousTarget = () => {
+    setTargetMonthlySavings(previousMonthlySetting?.targetSavings?.toString() || '');
+    setIsSavedTarget(false);
+  };
+
+  // 2. 過去6ヶ月の家計簿月末時点での貯金総額の推移データ作成
   const savingsTrendData = useMemo(() => {
     if (!settings || allMonthlySettings.length === 0) return [];
 
     const months = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      months.push(getLocalDateString(d).slice(0, 7)); // "YYYY-MM"
+      let month = currentMonthStr;
+      for (let step = 0; step < i; step += 1) month = getPrevMonth(month);
+      months.push(month);
     }
 
     return months.map(m => {
@@ -85,14 +95,14 @@ export default function SavingsPage() {
         .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= m)
         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
-      const balance = initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions);
+      const balance = Math.max(0, initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions));
 
       return {
-        name: m.split('-')[1] + '月',
+        name: `${parseInt(m.split('-')[1], 10)}月分`,
         貯金残高: balance
       };
     });
-  }, [settings, allMonthlySettings, savingsRecords, transactions, initialSavings]);
+  }, [settings, allMonthlySettings, savingsRecords, transactions, initialSavings, currentMonthStr]);
 
   // 3. 今月の貯金からの支出 (切り崩し)
   const currentMonthDepletionTx = useMemo(() => {
@@ -159,12 +169,12 @@ export default function SavingsPage() {
 
     try {
       await db.monthlySettings.put({
-        month: currentMonthStr,
+        month: targetMonth,
         targetSavings: num
       });
       setIsSavedTarget(true);
       setTimeout(() => setIsSavedTarget(false), 2500);
-      alert(`📅 ${currentMonthStr} の貯金積立目標額を ${formatCurrency(num)} に設定しました！`);
+      alert(`📅 ${targetMonthLabel}の貯金積立額を ${formatCurrency(num)} に設定しました！`);
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -252,16 +262,28 @@ export default function SavingsPage() {
         </div>
       </div>
 
-      {/* 📅 毎月の貯金積立目標 設定カード */}
+      {/* 📅 毎月の貯金積立額 設定カード */}
       <div className="card mb-lg" style={{ padding: '20px', border: '1px solid var(--border-color)', borderRadius: '20px' }}>
         <div className="flex-between items-center mb-xs">
           <h3 className="font-bold text-sm text-primary flex items-center gap-xs" style={{ margin: 0 }}>
             <Sparkles size={16} />
-            <span>{currentMonthStr} の貯金積立目標</span>
+            <span>{targetMonthLabel}の貯金積立額</span>
           </h3>
           <span className="text-xs text-secondary font-bold">
             現在: <span className="text-primary font-bold">{formatCurrency(currentMonthlySetting?.targetSavings || 0)}</span>
           </span>
+        </div>
+        <div className="month-switcher" aria-label="貯金積立の対象月">
+          <button type="button" className="btn-icon" onClick={() => setTargetMonth(getPrevMonth(targetMonth))} aria-label="前月">
+            ‹
+          </button>
+          <div className="month-switcher-current">
+            <span className="text-xs text-secondary">積立対象月</span>
+            <strong>{targetMonth === currentMonthStr ? '今月' : targetMonth}</strong>
+          </div>
+          <button type="button" className="btn-icon" onClick={() => setTargetMonth(getNextMonth(targetMonth))} aria-label="翌月">
+            ›
+          </button>
         </div>
         <p className="text-xs text-secondary mb-md leading-relaxed">
           毎月いくら貯蓄に回すかを設定します。設定した金額は手元資金から差し引かれ、当月の貯金に自動計上されます。
@@ -296,6 +318,10 @@ export default function SavingsPage() {
             <span>{isSavedTarget ? '保存完了' : '設定する'}</span>
           </button>
         </form>
+        <button type="button" className="btn btn-outline w-full mt-sm" onClick={handleApplyPreviousTarget}>
+          <History size={16} />
+          <span>先月の貯金積立額を反映</span>
+        </button>
       </div>
 
       {/* 📈 貯蓄推移グラフ */}

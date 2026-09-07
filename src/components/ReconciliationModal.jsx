@@ -4,6 +4,7 @@ import { X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { db } from '../db/db';
 import { getLocalDateString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
+import { isSettledReimbursement } from '../utils/transactionUtils';
 
 export default function ReconciliationModal({ isOpen, onClose, onComplete }) {
   const [reconciledAmounts, setReconciledAmounts] = useState({});
@@ -27,7 +28,7 @@ export default function ReconciliationModal({ isOpen, onClose, onComplete }) {
       if (t.date && t.date <= todayStr) {
         if (t.type === 'income') {
           if (balances[t.assetId] !== undefined) balances[t.assetId] += t.amount;
-        } else if (t.type === 'expense') {
+        } else if (t.type === 'expense' && !isSettledReimbursement(t)) {
           if (balances[t.assetId] !== undefined) balances[t.assetId] -= t.amount;
         } else if (t.type === 'transfer') {
           if (balances[t.fromAssetId] !== undefined) balances[t.fromAssetId] -= t.amount;

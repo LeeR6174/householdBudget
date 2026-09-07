@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { db } from '../db/db';
-import { getLocalDateString, getLocalISOString } from '../utils/dateUtils';
+import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
 
 export default function AddTransactionPage() {
@@ -11,7 +11,7 @@ export default function AddTransactionPage() {
   const { id } = useParams();
   const isEditing = !!id;
 
-  const [type, setType] = useState('expense'); // 'expense' | 'income' | 'transfer'
+  const [type, setType] = useState('expense'); // 'expense' | 'income' | 'transfer' | 'reimbursement'
   
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -20,6 +20,8 @@ export default function AddTransactionPage() {
   const [fromAssetId, setFromAssetId] = useState(''); // for transfer
   const [toAssetId, setToAssetId] = useState(''); // for transfer
   const [isSavingsDepletion, setIsSavingsDepletion] = useState(false);
+  const [isReimbursement, setIsReimbursement] = useState(false);
+  const [reimbursementStatus, setReimbursementStatus] = useState('pending');
   
   const [content, setContent] = useState('');
   const [memo, setMemo] = useState('');
@@ -42,7 +44,7 @@ export default function AddTransactionPage() {
       const newCat = {
         id: newId,
         name: newCatName.trim(),
-        type,
+        type: type === 'reimbursement' ? 'expense' : type,
         color: newCatColor,
         monthlyLimit: 0,
         isCarryover: false,
@@ -59,7 +61,8 @@ export default function AddTransactionPage() {
     }
   };
 
-  const categories = useLiveQuery(() => db.categories.where('type').equals(type).toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))), [type]) || [];
+  const categoryType = type === 'reimbursement' ? 'expense' : type;
+  const categories = useLiveQuery(() => db.categories.where('type').equals(categoryType).toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))), [categoryType]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const settings = useLiveQuery(() => db.settings.get('master'));
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
@@ -69,7 +72,10 @@ export default function AddTransactionPage() {
   const currentSavings = useMemo(() => {
     if (!settings) return 0;
     const initial = settings.targetSavings || 0;
-    const monthly = allMonthlySettings.reduce((sum, s) => sum + (s.targetSavings || 0), 0);
+    const currentBudgetMonth = getCurrentBudgetMonth();
+    const monthly = allMonthlySettings
+      .filter(s => s.month <= currentBudgetMonth)
+      .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
     const extra = savingsRecords.filter(r => r.type === 'addition').reduce((sum, r) => sum + (r.amount || 0), 0);
     const dbDep = savingsRecords.filter(r => r.type === 'depletion').reduce((sum, r) => sum + (r.amount || 0), 0);
     const txDep = allTransactions
@@ -86,7 +92,7 @@ export default function AddTransactionPage() {
 
   React.useEffect(() => {
     if (existingTx) {
-      setType(existingTx.type);
+      setType(existingTx.type === 'reimbursement' || existingTx.isReimbursement ? 'reimbursement' : existingTx.type);
       setAmount(existingTx.amount.toString());
       setCategoryId(existingTx.categoryId || '');
       setAssetId(existingTx.assetId || '');
@@ -96,6 +102,8 @@ export default function AddTransactionPage() {
       setMemo(existingTx.memo || '');
       setDate(existingTx.date);
       setIsSavingsDepletion(existingTx.isSavingsDepletion || false);
+      setIsReimbursement(existingTx.isReimbursement || existingTx.type === 'reimbursement');
+      setReimbursementStatus(existingTx.reimbursementStatus || (existingTx.type === 'reimbursement' ? 'settled' : 'pending'));
     } else if (!isEditing && assets.length === 1) {
       // Auto-select asset if only one exists
       setAssetId(assets[0].id);
@@ -117,7 +125,7 @@ export default function AddTransactionPage() {
     try {
       const baseTx = {
         id: isEditing ? id : crypto.randomUUID(),
-        type,
+        type: type === 'reimbursement' ? 'expense' : type,
         amount: Number(amount),
         content,
         memo,
@@ -135,7 +143,7 @@ export default function AddTransactionPage() {
         baseTx.categoryId = null;
         baseTx.assetId = null;
       } else {
-        if (isSavingsDepletion) {
+        if (type === 'expense' && isSavingsDepletion) {
           if (!assetId) {
             alert('使用資産を選択してください');
             return;
@@ -144,14 +152,16 @@ export default function AddTransactionPage() {
           baseTx.assetId = assetId;
           baseTx.isSavingsDepletion = true;
         } else {
-          if (!categoryId || !assetId) {
-            alert('カテゴリと資産を選択してください');
+          if ((!categoryId && !isReimbursement) || !assetId) {
+            alert(isReimbursement ? '使用資産を選択してください' : 'カテゴリと資産を選択してください');
             return;
           }
-          baseTx.categoryId = categoryId;
+          baseTx.categoryId = categoryId || null;
           baseTx.assetId = assetId;
           baseTx.isSavingsDepletion = false;
         }
+        baseTx.isReimbursement = type === 'reimbursement' || (type === 'expense' && isReimbursement);
+        baseTx.reimbursementStatus = baseTx.isReimbursement ? reimbursementStatus : undefined;
         baseTx.fromAssetId = null;
         baseTx.toAssetId = null;
 
@@ -184,6 +194,18 @@ export default function AddTransactionPage() {
     }
   };
 
+  const handleSettleReimbursement = async () => {
+    if (!existingTx?.isReimbursement && existingTx?.type !== 'reimbursement') return;
+    if (existingTx.type !== 'reimbursement' && existingTx.reimbursementStatus === 'settled') return;
+    if (!window.confirm('返金を確認し、この立替支出を家計簿の集計から外しますか？')) return;
+    await db.transactions.update(id, {
+      type: 'expense',
+      isReimbursement: true,
+      reimbursementStatus: 'settled'
+    });
+    navigate(-1);
+  };
+
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
       <div className="flex gap-sm items-center mb-lg">
@@ -204,30 +226,40 @@ export default function AddTransactionPage() {
         </div>
       ) : (
         <>
-          <div className="toggle-group" style={{ display: 'flex', gap: '4px' }}>
+          <div className="toggle-group transaction-type-toggle">
         <button 
           className={`toggle-btn expense ${type === 'expense' ? 'active' : ''}`}
-          onClick={() => setType('expense')}
+          onClick={() => { setType('expense'); setIsReimbursement(false); }}
         >支出</button>
         <button 
           className={`toggle-btn income ${type === 'income' ? 'active' : ''}`}
-          onClick={() => setType('income')}
+          onClick={() => { setType('income'); setIsReimbursement(false); setIsSavingsDepletion(false); }}
         >収入</button>
-        <button 
+            <button
           className={`toggle-btn ${type === 'transfer' ? 'active' : ''}`}
           style={{ 
             backgroundColor: type === 'transfer' ? 'var(--surface-color)' : 'transparent',
             boxShadow: type === 'transfer' ? 'var(--shadow-sm)' : 'none',
             color: type === 'transfer' ? 'var(--text-primary)' : 'var(--text-secondary)'
           }}
-          onClick={() => setType('transfer')}
+          onClick={() => { setType('transfer'); setIsReimbursement(false); setIsSavingsDepletion(false); }}
         >振替</button>
+        <button
+          type="button"
+          className={`toggle-btn ${type === 'reimbursement' ? 'active' : ''}`}
+          style={{
+            backgroundColor: type === 'reimbursement' ? 'var(--surface-color)' : 'transparent',
+            boxShadow: type === 'reimbursement' ? 'var(--shadow-sm)' : 'none',
+            color: type === 'reimbursement' ? 'var(--income-color)' : 'var(--text-secondary)'
+          }}
+          onClick={() => { setType('reimbursement'); setIsReimbursement(true); setIsSavingsDepletion(false); }}
+        >立替支出</button>
       </div>
 
       <form onSubmit={handleSave} className="card">
         <div className="form-group">
           <label className="form-label">金額 (円)</label>
-          <input 
+            <input
             type="number" 
             inputMode="numeric"
             pattern="[0-9]*"
@@ -258,7 +290,6 @@ export default function AddTransactionPage() {
 
         {type !== 'transfer' ? (
           <>
-            {/* 🐷 貯金（ロック分）から支払うチェックボックス */}
             {type === 'expense' && (
               <div 
                 className="form-group flex-between mb-md p-md" 
@@ -349,7 +380,7 @@ export default function AddTransactionPage() {
                     新規追加
                   </button>
                 </div>
-                <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required={!isSavingsDepletion}>
+                <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required={!isSavingsDepletion && !isReimbursement}>
                   <option value="" disabled>分類を選択</option>
                   {categories.map(cat => {
                     const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
@@ -421,6 +452,15 @@ export default function AddTransactionPage() {
         <button type="submit" className="btn btn-primary w-full shadow-lg text-lg py-3">
           {isEditing ? '更新する' : '保存する'}
         </button>
+        {isEditing && (existingTx?.isReimbursement || existingTx?.type === 'reimbursement') && reimbursementStatus !== 'settled' && (
+          <button
+            type="button"
+            className="btn w-full mt-md settle-editor-button"
+            onClick={handleSettleReimbursement}
+          >
+            返金済み・立替済みにする
+          </button>
+        )}
         {isEditing && (
           <button 
             type="button" 

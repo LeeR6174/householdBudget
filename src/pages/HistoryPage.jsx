@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Filter, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { db } from '../db/db';
@@ -9,6 +9,7 @@ import TransactionItem from '../components/TransactionItem';
 
 export default function HistoryPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
   const monthRange = getMonthRange(currentMonth);
   
@@ -20,10 +21,15 @@ export default function HistoryPage() {
     maxAmount: '',
     exactAmount: '',
     keyword: '',
-    categoryId: 'all',
+    categoryId: searchParams.get('categoryId') || 'all',
     transactionType: 'all', // all, income, expense, transfer
     assetType: 'all', // all, bank, cash, credit
   });
+
+  useEffect(() => {
+    const categoryId = searchParams.get('categoryId');
+    if (categoryId) setFilters(prev => ({ ...prev, categoryId }));
+  }, [searchParams]);
 
   // フィルタが初期状態から変更されているか
   const isFilterActive = 
@@ -49,6 +55,11 @@ export default function HistoryPage() {
 
   const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+
+  const handleSettleReimbursement = async (transaction) => {
+    if (!window.confirm('返金を確認し、この立替支出を家計簿の集計から外しますか？')) return;
+    await db.transactions.update(transaction.id, { reimbursementStatus: 'settled' });
+  };
 
   const transactions = useLiveQuery(async () => {
     // 日付範囲でまず取得
@@ -81,13 +92,15 @@ export default function HistoryPage() {
       // カテゴリフィルタ
       let categoryOk = true;
       if (filters.categoryId !== 'all') {
-        categoryOk = tx.categoryId === filters.categoryId;
+        categoryOk = filters.categoryId === 'uncategorized' ? !tx.categoryId : tx.categoryId === filters.categoryId;
       }
 
       // 取引タイプフィルタ
       let typeOk = true;
       if (filters.transactionType !== 'all') {
-        typeOk = tx.type === filters.transactionType;
+        typeOk = filters.transactionType === 'reimbursement'
+          ? tx.isReimbursement === true || tx.type === 'reimbursement'
+          : tx.type === filters.transactionType;
       }
       
       // 資産タイプフィルタ
@@ -171,7 +184,7 @@ export default function HistoryPage() {
       chips.push({ label: `カテゴリ: ${cat?.name || '不明'}`, onClick: () => handleRemoveFilter('categoryId', 'all') });
     }
     if (filters.transactionType !== 'all') {
-      const typeLabel = { income: '収入', expense: '支出', transfer: '振替' }[filters.transactionType];
+      const typeLabel = { income: '収入', expense: '支出', transfer: '振替', reimbursement: '立替支出' }[filters.transactionType];
       chips.push({ label: `タイプ: ${typeLabel}`, onClick: () => handleRemoveFilter('transactionType', 'all') });
     }
     if (filters.assetType !== 'all') {
@@ -357,6 +370,7 @@ export default function HistoryPage() {
                   <option value="expense">支出</option>
                   <option value="income">収入</option>
                   <option value="transfer">振替</option>
+                      <option value="reimbursement">立替支出</option>
                 </select>
               </div>
               <div className="form-group mb-0">
@@ -406,6 +420,7 @@ export default function HistoryPage() {
             categories={categories} 
             assets={assets} 
             onClick={() => navigate(`/edit/${tx.id}`)}
+            onSettle={handleSettleReimbursement}
           />
         ))}
         {transactions.length === 0 && (

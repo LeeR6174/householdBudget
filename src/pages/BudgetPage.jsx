@@ -9,6 +9,7 @@ import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getPrevMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
+import { isSettledReimbursement } from '../utils/transactionUtils';
 
 export default function BudgetPage() {
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function BudgetPage() {
   const prevSpentByCat = useMemo(() => {
     const map = {};
     prevMonthTxs.forEach(t => {
-      if (t.type === 'expense' && !t.isSavingsDepletion && t.categoryId) {
+      if (t.type === 'expense' && !t.isSavingsDepletion && !isSettledReimbursement(t) && t.categoryId) {
         map[t.categoryId] = (map[t.categoryId] || 0) + t.amount;
       }
     });
@@ -326,11 +327,20 @@ export default function BudgetPage() {
 
       {/* Categories List */}
       <div className="card" style={{ padding: '20px 16px' }}>
-        <div className="flex-between items-center mb-md">
+        <div className="flex-between items-center mb-md gap-sm">
           <h3 className="font-bold text-sm text-secondary" style={{ margin: 0 }}>
             予算カテゴリ一覧（{displayMonthStr}）
           </h3>
-          <span className="text-xs text-secondary">{categories.length}件</span>
+          <div className="flex-center gap-xs">
+            <span className="text-xs text-secondary">{categories.length}件</span>
+            <button
+              type="button"
+              className="budget-add-category-button"
+              onClick={() => navigate('/settings/categories')}
+            >
+              ＋カテゴリ追加
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gap: '14px' }}>
@@ -464,7 +474,20 @@ export default function BudgetPage() {
           })}
 
           {categories.length === 0 && (
-            <p className="text-secondary text-sm text-center py-lg">支出カテゴリがありません</p>
+            <div className="budget-empty-state">
+              <div className="text-2xl mb-sm">📊</div>
+              <div className="font-bold">予算カテゴリがありません</div>
+              <p className="text-secondary text-sm mt-xs mb-md">
+                先に支出カテゴリを追加すると、この月の予算を設定できます。
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate('/settings/categories')}
+              >
+                支出カテゴリを追加
+              </button>
+            </div>
           )}
         </div>
 

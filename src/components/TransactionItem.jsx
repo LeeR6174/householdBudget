@@ -2,14 +2,39 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 
-export default function TransactionItem({ transaction, categories, assets, onClick }) {
+export default function TransactionItem({ transaction, categories, assets, onClick, onSettle }) {
   const isIncome = transaction.type === 'income';
   const isTransfer = transaction.type === 'transfer';
+  const isLegacyReimbursement = transaction.type === 'reimbursement';
+  const isReimbursement = isLegacyReimbursement || transaction.isReimbursement === true;
+  const isPendingReimbursement = transaction.isReimbursement === true && transaction.reimbursementStatus !== 'settled';
   
   const category = categories?.find(c => c.id === transaction.categoryId);
   const asset = assets?.find(a => a.id === transaction.assetId);
   const fromAsset = assets?.find(a => a.id === transaction.fromAssetId);
   const toAsset = assets?.find(a => a.id === transaction.toAssetId);
+
+  if (isLegacyReimbursement) {
+    return (
+      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
+        <div className="flex items-center gap-md flex-1 min-w-0">
+          <div className="category-block flex-center" style={{ backgroundColor: '#d1fae5', color: '#047857', fontSize: '18px' }}>
+            ↔
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="font-bold text-base truncate leading-tight mb-xs">
+              {transaction.content || '立替精算'}
+            </div>
+            <div className="flex items-center gap-sm">
+              <span className="text-xs text-secondary truncate">{asset?.name || '不明'} · 支出/収入から除外</span>
+              <span className="text-xs text-secondary ml-auto" style={{ opacity: 0.6 }}>{formatDate(transaction.date)}</span>
+            </div>
+          </div>
+        </div>
+        <div className="font-bold text-base text-income text-right ml-md flex-shrink-0">精算済み</div>
+      </div>
+    );
+  }
 
   // 振替の場合のUI
   if (isTransfer) {
@@ -75,14 +100,36 @@ export default function TransactionItem({ transaction, categories, assets, onCli
                 貯金切崩し
               </span>
             )}
+            {transaction.isReimbursement && (
+              <span
+                className="text-[9px] font-bold px-sm py-xs rounded"
+                style={{ backgroundColor: isPendingReimbursement ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)', color: isPendingReimbursement ? '#b45309' : 'var(--income-color)', lineHeight: 1 }}
+              >
+                {isPendingReimbursement ? '立替中' : '立替済み・集計外'}
+              </span>
+            )}
             <span className="text-xs text-secondary ml-auto" style={{ opacity: 0.6 }}>
               {formatDate(transaction.date)}
             </span>
           </div>
         </div>
       </div>
-      <div className={`font-bold text-lg text-right ml-md flex-shrink-0 ${isIncome ? 'text-income' : 'text-expense'}`}>
-        {isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
+      <div className="flex items-center gap-sm ml-md flex-shrink-0">
+        <div className={`font-bold text-lg text-right ${isReimbursement && !isPendingReimbursement ? 'text-income' : isIncome ? 'text-income' : 'text-expense'}`}>
+          {isReimbursement && !isPendingReimbursement ? '立替済み' : `${isIncome ? '+' : '-'}${formatCurrency(transaction.amount)}`}
+        </div>
+        {isPendingReimbursement && onSettle && (
+          <button
+            type="button"
+            className="settle-button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSettle(transaction);
+            }}
+          >
+            立替済みにする
+          </button>
+        )}
       </div>
     </div>
   );

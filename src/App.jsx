@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Home, Clock, PieChart, Settings as SettingsIcon, CreditCard, BarChart2, PiggyBank } from 'lucide-react';
+import { Home, Clock, Settings as SettingsIcon, CreditCard, PiggyBank } from 'lucide-react';
 import { initDB, db } from './db/db';
 import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from './utils/dateUtils';
 
@@ -17,6 +17,7 @@ import InitialBalancePage from './pages/InitialBalancePage';
 import AIImportPage from './pages/AIImportPage';
 import SavingsPage from './pages/SavingsPage';
 import BudgetPage from './pages/BudgetPage';
+import MonthStartPage from './pages/MonthStartPage';
 
 function BottomNav() {
   const location = useLocation();
@@ -59,8 +60,6 @@ function App() {
       try {
         // --- 1. サブスク・固定費の自動入力処理 ---
         const subs = await db.subscriptions.toArray();
-        const today = new Date();
-        const currentDay = today.getDate();
         const currentBudgetMonth = getCurrentBudgetMonth();
         
         for (const sub of subs) {
@@ -82,51 +81,6 @@ function App() {
           }
         }
 
-        // --- 2. 通知権限と Periodic Sync の登録 ---
-        if ('serviceWorker' in navigator && 'Notification' in window) {
-          const registration = await navigator.serviceWorker.ready;
-          
-          // 通知権限の確認とリクエスト
-          if (Notification.permission === 'default') {
-            await Notification.requestPermission();
-          }
-
-          // Periodic Sync の登録 (Chrome/Edgeなどの対応ブラウザのみ)
-          if ('periodicSync' in registration) {
-            try {
-              const status = await navigator.permissions.query({
-                name: 'periodic-background-sync',
-              });
-              
-              if (status.state === 'granted') {
-                await registration.periodicSync.register('check-notifications', {
-                  minInterval: 24 * 60 * 60 * 1000, // 最小1日間隔
-                });
-              }
-            } catch (err) {
-              console.warn('Periodic Sync registration failed:', err);
-            }
-          }
-          
-          // --- 3. アプリ起動時のシステム通知（フォールバック） ---
-          // 通知が煩わしいとの意見があったため、現在は Service Worker (sw.js) の
-          // Periodic Background Sync での通知のみに制限しています。
-        }
-        // --- 4. 通知リマインドの処理 ---
-        const notifications = await db.notifications.toArray();
-        for (const n of notifications) {
-          if (currentDay >= n.day && n.lastProcessedMonth !== currentBudgetMonth) {
-            const registration = await navigator.serviceWorker.ready;
-            registration.showNotification('格が違う家計簿', {
-              body: n.message,
-              icon: '/favicon.png',
-              badge: '/pwa-192x192.png',
-              tag: `reminder-${n.id}`,
-              silent: true
-            });
-            await db.notifications.update(n.id, { lastProcessedMonth: currentBudgetMonth });
-          }
-        }
       } catch (err) {
         console.error('Initial DB Process error:', err);
       }
@@ -146,6 +100,7 @@ function App() {
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/budget" element={<BudgetPage />} />
+          <Route path="/settings/month-start" element={<MonthStartPage />} />
           <Route path="/settings/categories" element={<CategoriesPage />} />
           <Route path="/settings/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/settings/initial-balance" element={<InitialBalancePage />} />
