@@ -371,20 +371,8 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      <div className="card mt-lg" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-        <h3 className="font-bold mb-md">アップデート内容 (V1.5.1.0)</h3>
-        <div className="text-sm text-secondary" style={{ lineHeight: '1.6' }}>
-          <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            <li>【重要】朝の時間帯に記録すると日付が前日になってしまうタイムゾーンの不具合を修正しました。</li>
-            <li>ホーム画面のデータ読み込み処理を抜本的に見直し、動作速度とメモリ効率を大幅に改善しました（データ量増加時の重さを解消）。</li>
-            <li>ホーム画面の内部プログラムを整理し、将来の機能追加に向けた保守性を向上させました。</li>
-          </ul>
-        </div>
-      </div>
-
       <div className="text-center mt-xl mb-lg opacity-50">
         <div className="text-xs font-bold">格が違う家計簿</div>
-        <div className="text-[10px]">Version 1.5.1.0</div>
       </div>
 
       {/* 残高照合モーダル */}

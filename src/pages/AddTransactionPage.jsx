@@ -5,6 +5,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { db } from '../db/db';
 import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
+import ReimbursementSettlementModal from '../components/ReimbursementSettlementModal';
 
 export default function AddTransactionPage() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function AddTransactionPage() {
   const [isSavingsDepletion, setIsSavingsDepletion] = useState(false);
   const [isReimbursement, setIsReimbursement] = useState(false);
   const [reimbursementStatus, setReimbursementStatus] = useState('pending');
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
   
   const [content, setContent] = useState('');
   const [memo, setMemo] = useState('');
@@ -194,15 +196,20 @@ export default function AddTransactionPage() {
     }
   };
 
-  const handleSettleReimbursement = async () => {
+  const handleSettleReimbursement = () => {
     if (!existingTx?.isReimbursement && existingTx?.type !== 'reimbursement') return;
     if (existingTx.type !== 'reimbursement' && existingTx.reimbursementStatus === 'settled') return;
-    if (!window.confirm('返金を確認し、この立替支出を家計簿の集計から外しますか？')) return;
+    setShowSettlementModal(true);
+  };
+
+  const handleSettlementMethodSelect = async (method) => {
     await db.transactions.update(id, {
       type: 'expense',
       isReimbursement: true,
-      reimbursementStatus: 'settled'
+      reimbursementStatus: 'settled',
+      reimbursementMethod: method
     });
+    setShowSettlementModal(false);
     navigate(-1);
   };
 
@@ -533,6 +540,11 @@ export default function AddTransactionPage() {
           </div>
         </div>
       )}
+      <ReimbursementSettlementModal
+        isOpen={showSettlementModal}
+        onClose={() => setShowSettlementModal(false)}
+        onSelect={handleSettlementMethodSelect}
+      />
       </>
       )}
     </div>

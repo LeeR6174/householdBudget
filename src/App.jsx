@@ -54,13 +54,15 @@ function BottomNav() {
 function App() {
   useEffect(() => {
     // 💡 UX Fix: Enable immediate :active CSS states on iOS Safari
-    document.body.addEventListener('touchstart', function() {}, { passive: true });
+    const handleTouchStart = () => {};
+    document.body.addEventListener('touchstart', handleTouchStart, { passive: true });
 
     initDB().then(async () => {
       try {
         // --- 1. サブスク・固定費の自動入力処理 ---
         const subs = await db.subscriptions.toArray();
         const currentBudgetMonth = getCurrentBudgetMonth();
+        const currentDay = new Date().getDate();
         
         for (const sub of subs) {
           if (currentDay >= sub.dayOfMonth && sub.lastProcessedMonth !== currentBudgetMonth) {
@@ -84,7 +86,11 @@ function App() {
       } catch (err) {
         console.error('Initial DB Process error:', err);
       }
+    }).catch((err) => {
+      console.error('Database initialization error:', err);
     });
+
+    return () => document.body.removeEventListener('touchstart', handleTouchStart);
   }, []);
 
   return (
