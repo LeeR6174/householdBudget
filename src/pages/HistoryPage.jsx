@@ -6,6 +6,7 @@ import { db } from '../db/db';
 import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
 import TransactionItem from '../components/TransactionItem';
+import ReimbursementSettlementModal from '../components/ReimbursementSettlementModal';
 
 export default function HistoryPage() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function HistoryPage() {
   const monthRange = getMonthRange(currentMonth);
   
   const [showFilters, setShowFilters] = useState(false);
+  const [settlementTransaction, setSettlementTransaction] = useState(null);
   const [filters, setFilters] = useState({
     startDate: monthRange.startDate,
     endDate: monthRange.endDate,
@@ -56,9 +58,16 @@ export default function HistoryPage() {
   const categories = useLiveQuery(() => db.categories.toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
 
-  const handleSettleReimbursement = async (transaction) => {
-    if (!window.confirm('返金を確認し、この立替支出を家計簿の集計から外しますか？')) return;
-    await db.transactions.update(transaction.id, { reimbursementStatus: 'settled' });
+  const handleSettleReimbursement = (transaction) => {
+    setSettlementTransaction(transaction);
+  };
+
+  const handleSettlementMethodSelect = async (method) => {
+    await db.transactions.update(settlementTransaction.id, {
+      reimbursementStatus: 'settled',
+      reimbursementMethod: method
+    });
+    setSettlementTransaction(null);
   };
 
   const transactions = useLiveQuery(async () => {
@@ -429,6 +438,12 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+
+      <ReimbursementSettlementModal
+        isOpen={Boolean(settlementTransaction)}
+        onClose={() => setSettlementTransaction(null)}
+        onSelect={handleSettlementMethodSelect}
+      />
     </div>
   );
 }

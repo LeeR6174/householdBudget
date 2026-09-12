@@ -16,7 +16,7 @@ export default function TransactionItem({ transaction, categories, assets, onCli
 
   if (isLegacyReimbursement) {
     return (
-      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
+      <div className="list-item transaction-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
         <div className="flex items-center gap-md flex-1 min-w-0">
           <div className="category-block flex-center" style={{ backgroundColor: '#d1fae5', color: '#047857', fontSize: '18px' }}>
             ↔
@@ -31,7 +31,12 @@ export default function TransactionItem({ transaction, categories, assets, onCli
             </div>
           </div>
         </div>
-        <div className="font-bold text-base text-income text-right ml-md flex-shrink-0">精算済み</div>
+        <div className="font-bold text-base text-income text-right ml-md flex-shrink-0 transaction-amount">
+          精算済み
+          {transaction.reimbursementMethod && (
+            <div className="text-xs text-secondary">{transaction.reimbursementMethod === 'bank' ? '銀行' : '現金'}返金</div>
+          )}
+        </div>
       </div>
     );
   }
@@ -39,7 +44,7 @@ export default function TransactionItem({ transaction, categories, assets, onCli
   // 振替の場合のUI
   if (isTransfer) {
     return (
-      <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
+      <div className="list-item transaction-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
         <div className="flex items-center gap-md flex-1 min-w-0">
           <div 
             className="category-block"
@@ -63,7 +68,7 @@ export default function TransactionItem({ transaction, categories, assets, onCli
             </div>
           </div>
         </div>
-        <div className="font-bold text-secondary text-right ml-md flex-shrink-0">
+        <div className="font-bold text-secondary text-right ml-md flex-shrink-0 transaction-amount">
           {formatCurrency(transaction.amount)}
         </div>
       </div>
@@ -72,7 +77,7 @@ export default function TransactionItem({ transaction, categories, assets, onCli
 
   // 収入・支出のUI
   return (
-    <div className="list-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
+    <div className="list-item transaction-item" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '12px 0' }}>
       <div className="flex items-center gap-md flex-1 min-w-0">
         <div 
           className="category-block flex-center"
@@ -114,9 +119,16 @@ export default function TransactionItem({ transaction, categories, assets, onCli
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-sm ml-md flex-shrink-0">
+      <div className="flex items-center gap-sm ml-md flex-shrink-0 transaction-actions">
         <div className={`font-bold text-lg text-right ${isReimbursement && !isPendingReimbursement ? 'text-income' : isIncome ? 'text-income' : 'text-expense'}`}>
-          {isReimbursement && !isPendingReimbursement ? '立替済み' : `${isIncome ? '+' : '-'}${formatCurrency(transaction.amount)}`}
+          {isReimbursement && !isPendingReimbursement ? (
+            <>
+              <div>立替済み</div>
+              {transaction.reimbursementMethod && (
+                <div className="text-xs text-secondary">{transaction.reimbursementMethod === 'bank' ? '銀行' : '現金'}返金</div>
+              )}
+            </>
+          ) : `${isIncome ? '+' : '-'}${formatCurrency(transaction.amount)}`}
         </div>
         {isPendingReimbursement && onSettle && (
           <button

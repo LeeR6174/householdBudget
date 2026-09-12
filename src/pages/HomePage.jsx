@@ -9,6 +9,7 @@ import MonthSelector from '../components/MonthSelector';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import TransactionItem from '../components/TransactionItem';
 import ReconciliationModal from '../components/ReconciliationModal';
+import ReimbursementSettlementModal from '../components/ReimbursementSettlementModal';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
 export default function HomePage() {
@@ -20,10 +21,18 @@ export default function HomePage() {
   
   // 照合モーダルの状態管理
   const [showReconcileModal, setShowReconcileModal] = useState(false);
+  const [settlementTransaction, setSettlementTransaction] = useState(null);
 
-  const handleSettleReimbursement = async (transaction) => {
-    if (!window.confirm('返金を確認し、この立替支出を家計簿の集計から外しますか？')) return;
-    await db.transactions.update(transaction.id, { reimbursementStatus: 'settled' });
+  const handleSettleReimbursement = (transaction) => {
+    setSettlementTransaction(transaction);
+  };
+
+  const handleSettlementMethodSelect = async (method) => {
+    await db.transactions.update(settlementTransaction.id, {
+      reimbursementStatus: 'settled',
+      reimbursementMethod: method
+    });
+    setSettlementTransaction(null);
   };
   
   if (!stats) {
@@ -401,6 +410,12 @@ export default function HomePage() {
         isOpen={showReconcileModal} 
         onClose={() => setShowReconcileModal(false)}
         onComplete={() => setShowReconcileModal(false)} 
+      />
+
+      <ReimbursementSettlementModal
+        isOpen={Boolean(settlementTransaction)}
+        onClose={() => setSettlementTransaction(null)}
+        onSelect={handleSettlementMethodSelect}
       />
     </div>
   );
