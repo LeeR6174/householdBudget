@@ -6,6 +6,7 @@ import { db } from '../db/db';
 import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/format';
 import ReimbursementSettlementModal from '../components/ReimbursementSettlementModal';
+import { isEmergencyCategory } from '../utils/categoryUtils';
 
 export default function AddTransactionPage() {
   const navigate = useNavigate();
@@ -390,7 +391,7 @@ export default function AddTransactionPage() {
                 <select className="form-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required={!isSavingsDepletion && !isReimbursement}>
                   <option value="" disabled>分類を選択</option>
                   {categories.map(cat => {
-                    const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+                    const isEm = isEmergencyCategory(cat);
                     return (
                       <option key={cat.id} value={cat.id}>
                         {isEm ? '🚨 ' : ''}{cat.name}{isEm ? '（特別緊急枠）' : ''}
@@ -400,7 +401,7 @@ export default function AddTransactionPage() {
                 </select>
                 {(() => {
                   const selectedCat = categories.find(c => c.id === categoryId);
-                  const isEmergency = selectedCat?.isEmergency || selectedCat?.isFixed || selectedCat?.name === '緊急支出';
+                  const isEmergency = isEmergencyCategory(selectedCat);
                   if (!isEmergency) return null;
                   return (
                     <div className="p-sm mt-xs rounded-xl flex items-start gap-xs animate-fade-in" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px' }}>

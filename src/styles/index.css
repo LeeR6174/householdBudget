@@ -46,6 +46,7 @@
 /* Base resets for UX & Responsiveness */
 html, body {
   overscroll-behavior-y: auto; /* Changed from none to auto to fix form scroll issues */
+  overflow-x: hidden;
 }
 
 body {
@@ -63,6 +64,7 @@ button, a, input, select, textarea, .list-item, .card {
 /* App Container (Mobile First) */
 .app-container {
   max-width: 480px;
+  width: 100%;
   margin: 0 auto;
   min-height: 100vh;
   position: relative;
@@ -771,6 +773,7 @@ input[type="datetime-local"].form-control {
   box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
   border-top: 1px solid rgba(148, 163, 184, 0.18);
   z-index: 20;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 .month-switcher {
@@ -919,6 +922,149 @@ input[type="datetime-local"].form-control {
 
   .flex-between.gap-md {
     gap: 8px;
+  }
+
+  .setup-field,
+  .setup-large-field {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .setup-field > span:first-child {
+    flex-wrap: wrap;
+    line-height: 1.35;
+  }
+
+  .setup-field > span:first-child small {
+    flex-basis: 100%;
+    padding-left: 18px;
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+
+  .setup-field input {
+    width: 104px;
+  }
+
+  .setup-actions .btn {
+    min-height: 48px;
+    padding: 10px 8px;
+    font-size: 0.84rem;
+    white-space: normal;
+  }
+
+  .page-header-row,
+  .month-start-page .flex.items-center {
+    gap: 8px;
+  }
+
+  .page-header-row .page-title,
+  .month-start-page .page-title {
+    min-width: 0;
+    font-size: 1.2rem;
+    line-height: 1.25;
+  }
+
+  .btn-back {
+    min-width: 76px;
+    padding: 9px 10px;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 390px) {
+  .page-container {
+    padding-right: 10px;
+    padding-left: 10px;
+    padding-bottom: 118px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .page-title {
+    font-size: 1.22rem;
+  }
+
+  .setup-section-title {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .setup-section-title h2 {
+    font-size: 0.98rem;
+  }
+
+  .setup-section-title p {
+    font-size: 0.72rem;
+  }
+
+  .setup-field {
+    align-items: flex-start;
+  }
+
+  .setup-field > div {
+    flex: 0 0 auto;
+  }
+
+  .setup-field input {
+    width: 96px;
+    font-size: 0.95rem;
+  }
+
+  .setup-large-field {
+    align-items: flex-start;
+  }
+
+  .setup-large-field input {
+    width: 132px;
+    font-size: 1.15rem;
+  }
+
+  .setup-summary > div {
+    align-items: flex-start;
+    padding: 10px 12px;
+    font-size: 0.76rem;
+  }
+
+  .setup-summary > div strong {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+  }
+
+  .bottom-nav {
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+  .nav-item {
+    min-width: 48px;
+    padding-right: 4px;
+    padding-left: 4px;
+    font-size: 0.68rem;
+  }
+
+  .nav-item svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .home-icon-wrapper {
+    width: 46px;
+    height: 46px;
+  }
+
+  .fab {
+    right: 16px;
+    bottom: calc(104px + env(safe-area-inset-bottom));
+    width: 52px;
+    height: 52px;
+  }
+
+  .transaction-item .category-block {
+    width: 44px;
+    font-size: 0.64rem;
   }
 }
 

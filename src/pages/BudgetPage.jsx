@@ -10,6 +10,7 @@ import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getPrevMonth, getMonthRange } from '../utils/dateUtils';
 import MonthSelector from '../components/MonthSelector';
 import { isSettledReimbursement } from '../utils/transactionUtils';
+import { isBudgetCategory, isEmergencyCategory } from '../utils/categoryUtils';
 
 export default function BudgetPage() {
   const navigate = useNavigate();
@@ -120,7 +121,7 @@ export default function BudgetPage() {
       }
 
       for (const cat of categories) {
-        if (cat.isEmergency || cat.isFixed || cat.name === '緊急支出') continue;
+        if (!isBudgetCategory(cat)) continue;
         const val = newInputs[cat.id];
         if (val !== '' && !isNaN(Number(val))) {
           await db.monthlyBudgets.add({
@@ -160,7 +161,7 @@ export default function BudgetPage() {
         }
 
         for (const cat of categories) {
-          if (cat.isEmergency || cat.isFixed || cat.name === '緊急支出') continue;
+          if (!isBudgetCategory(cat)) continue;
           const val = budgetInputs[cat.id];
           if (val !== '' && val !== undefined && !isNaN(Number(val))) {
             await db.monthlyBudgets.add({
@@ -185,7 +186,7 @@ export default function BudgetPage() {
   // 計算：当月総予算（緊急支出は除外）
   const totalBudget = useMemo(() => {
     return categories.reduce((sum, cat) => {
-      const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+      const isEm = isEmergencyCategory(cat);
       if (isEm) return sum;
       const num = Number(budgetInputs[cat.id]);
       return sum + (isNaN(num) ? 0 : num);
@@ -195,7 +196,7 @@ export default function BudgetPage() {
   // 計算：前月総予算（緊急支出は除外）
   const prevTotalBudget = useMemo(() => {
     return categories.reduce((sum, cat) => {
-      const isEm = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+      const isEm = isEmergencyCategory(cat);
       if (isEm) return sum;
       const prevEntry = prevMonthBudgets.find(b => b.categoryId === cat.id);
       const val = prevEntry ? prevEntry.budget : (cat.monthlyLimit || 0);
@@ -345,7 +346,7 @@ export default function BudgetPage() {
 
         <div style={{ display: 'grid', gap: '14px' }}>
           {categories.map(cat => {
-            const isEmergency = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+            const isEmergency = isEmergencyCategory(cat);
             const val = budgetInputs[cat.id] ?? '';
             const prevEntry = prevMonthBudgets.find(b => b.categoryId === cat.id);
             const prevBudgetAmount = prevEntry ? prevEntry.budget : (cat.monthlyLimit || 0);

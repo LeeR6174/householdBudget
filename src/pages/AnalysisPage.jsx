@@ -10,6 +10,7 @@ import { formatCurrency } from '../utils/format';
 import MonthSelector from '../components/MonthSelector';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, PiggyBank, CreditCard, HelpCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { isSettledReimbursement } from '../utils/transactionUtils';
+import { isEmergencyCategory } from '../utils/categoryUtils';
 
 export default function AnalysisPage() {
   const [currentMonth, setCurrentMonth] = useState(getCurrentBudgetMonth());
@@ -73,11 +74,7 @@ export default function AnalysisPage() {
 
           // 固定費 vs 変動費 vs 緊急支出
           const cat = categories.find(c => c.id === tx.categoryId);
-          const isEmergency = cat && (
-            cat.id === 'cat_special_emergency' ||
-            cat.isEmergency ||
-            cat.name === '緊急支出'
-          );
+          const isEmergency = isEmergencyCategory(cat);
           const isFixed = !isEmergency && cat && (
             subCategoryIds.includes(cat.id) ||
             fixedKeywords.some(kw => cat.name.includes(kw))
@@ -126,11 +123,7 @@ export default function AnalysisPage() {
           expense += tx.amount;
           
           const cat = categories.find(c => c.id === tx.categoryId);
-          const isEmergency = cat && (
-            cat.id === 'cat_special_emergency' ||
-            cat.isEmergency ||
-            cat.name === '緊急支出'
-          );
+          const isEmergency = isEmergencyCategory(cat);
           const isFixed = !isEmergency && cat && (
             subCategoryIds.includes(cat.id) ||
             fixedKeywords.some(kw => cat.name.includes(kw))
@@ -275,7 +268,7 @@ export default function AnalysisPage() {
         name: cat.name,
         value: analytics.catExpenses[cat.id] || 0,
         fill: cat.color || '#8884d8',
-        isEmergency: cat.id === 'cat_special_emergency' || cat.name === '緊急支出'
+        isEmergency: isEmergencyCategory(cat)
       }));
     if (analytics.catExpenses['uncategorized'] > 0) {
       data.push({ id: 'uncategorized', name: '未分類・不明', value: analytics.catExpenses['uncategorized'], fill: '#9ca3af', isEmergency: false });
