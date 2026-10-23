@@ -2,7 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { calculateCarryoverBalance } from '../utils/budgetUtils';
 import { getLocalDateString, getBudgetMonth } from '../utils/dateUtils';
-import { isSettledReimbursement } from '../utils/transactionUtils';
+import { isCountedExpense, isSettledReimbursement } from '../utils/transactionUtils';
+import { isEmergencyCategory } from '../utils/categoryUtils';
 
 export function useDashboardStats(currentMonth, startDate, endDate) {
   return useLiveQuery(async () => {
@@ -109,7 +110,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
 
     const emergencyCatIds = new Set(
       categories
-        .filter(c => c.isEmergency || c.isFixed || c.name === '緊急支出')
+        .filter(isEmergencyCategory)
         .map(c => c.id)
     );
     emergencyCatIds.add('cat_special_emergency');
@@ -117,7 +118,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     currentMonthTx.forEach(t => {
       if (t.type === 'income') income += t.amount;
       if (t.type === 'expense') {
-        if (!t.isSavingsDepletion && !isSettledReimbursement(t)) {
+        if (isCountedExpense(t)) {
           expense += t.amount;
           const catId = t.categoryId || 'uncategorized';
           expenseByCategory[catId] = (expenseByCategory[catId] || 0) + t.amount;
@@ -137,7 +138,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
 
     const txByCategory = {};
     allTx.forEach(t => {
-      if (!isSettledReimbursement(t)) {
+      if (isCountedExpense(t)) {
         if (!txByCategory[t.categoryId]) txByCategory[t.categoryId] = [];
         txByCategory[t.categoryId].push(t);
       }
@@ -154,7 +155,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     let totalNormalExpense = 0;
 
     const categoryStats = categories.filter(c => c.type === 'expense').map(cat => {
-      const isEmergency = emergencyCatIds.has(cat.id) || cat.isEmergency || cat.name === '緊急支出';
+      const isEmergency = emergencyCatIds.has(cat.id) || isEmergencyCategory(cat);
       const spent = expenseByCategory[cat.id] || 0;
       const catTxs = txByCategory[cat.id] || [];
       const catBudgets = budgetsByCat[cat.id] || [];

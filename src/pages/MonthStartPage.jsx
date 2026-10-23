@@ -5,7 +5,9 @@ import { Check, ChevronLeft, ChevronRight, PiggyBank, WalletCards } from 'lucide
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getMonthRange } from '../utils/dateUtils';
-import { isSettledReimbursement } from '../utils/transactionUtils';
+import { calculateCarryoverAvailable } from '../utils/budgetUtils';
+import { isCountedExpense } from '../utils/transactionUtils';
+import { isBudgetCategory, isEmergencyCategory } from '../utils/categoryUtils';
 
 export default function MonthStartPage() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function MonthStartPage() {
     items.sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
   ))) || [];
   const monthlyBudgets = useLiveQuery(() => db.monthlyBudgets.where('month').equals(selectedMonth).toArray()) || [];
+  const allMonthlyBudgets = useLiveQuery(() => db.monthlyBudgets.toArray()) || [];
   const monthlySetting = useLiveQuery(() => db.monthlySettings.get(selectedMonth));
   const monthTransactions = useLiveQuery(() => db.transactions.where('date').between(startDate, endDate, true, true).toArray()) || [];
 
@@ -37,17 +40,34 @@ export default function MonthStartPage() {
   }, [monthlySetting]);
 
   const normalBudgetTotal = useMemo(() => categories.reduce((total, category) => {
-    const isEmergency = category.isEmergency || category.isFixed || category.name === '緊急支出';
+    const isEmergency = isEmergencyCategory(category);
     return isEmergency ? total : total + (Number(budgetInputs[category.id]) || 0);
   }, 0), [categories, budgetInputs]);
 
+  const availableBudgetByCategory = useMemo(() => {
+    const result = {};
+    categories.forEach(category => {
+      if (!category.isCarryover) return;
+      const categoryTransactions = monthTransactions.filter(transaction => transaction.categoryId === category.id);
+      const categoryBudgets = allMonthlyBudgets.filter(budget => budget.categoryId === category.id);
+      result[category.id] = calculateCarryoverAvailable(
+        category,
+        selectedMonth,
+        Number(budgetInputs[category.id]) || 0,
+        categoryTransactions,
+        categoryBudgets
+      );
+    });
+    return result;
+  }, [categories, budgetInputs, monthTransactions, allMonthlyBudgets, selectedMonth]);
+
   const currentSpent = useMemo(() => monthTransactions
-    .filter(transaction => transaction.type === 'expense' && !transaction.isSavingsDepletion && !isSettledReimbursement(transaction))
+    .filter(isCountedExpense)
     .reduce((total, transaction) => total + transaction.amount, 0), [monthTransactions]);
 
   const emergencySpent = useMemo(() => monthTransactions
-    .filter(transaction => transaction.type === 'expense' && transaction.categoryId && !transaction.isSavingsDepletion && !isSettledReimbursement(transaction))
-    .filter(transaction => categories.find(category => category.id === transaction.categoryId && (category.isEmergency || category.isFixed || category.name === '緊急支出')))
+    .filter(transaction => isCountedExpense(transaction) && transaction.categoryId)
+    .filter(transaction => categories.find(category => category.id === transaction.categoryId && isEmergencyCategory(category)))
     .reduce((total, transaction) => total + transaction.amount, 0), [categories, monthTransactions]);
 
   const expectedExpense = normalBudgetTotal + emergencySpent;
@@ -62,7 +82,7 @@ export default function MonthStartPage() {
       const existingBudgets = await db.monthlyBudgets.where('month').equals(selectedMonth).toArray();
       await Promise.all(existingBudgets.map(item => db.monthlyBudgets.delete(item.id)));
       const budgetsToAdd = categories
-        .filter(category => !(category.isEmergency || category.isFixed || category.name === '緊急支出'))
+        .filter(isBudgetCategory)
         .map(category => ({ categoryId: category.id, month: selectedMonth, budget: Number(budgetInputs[category.id]) || 0 }))
         .filter(item => item.budget >= 0);
       if (budgetsToAdd.length > 0) await db.monthlyBudgets.bulkAdd(budgetsToAdd);
@@ -95,14 +115,15 @@ export default function MonthStartPage() {
         <section className="card setup-section">
           <div className="setup-section-title"><WalletCards size={20} /><div><h2>今月の予算</h2><p>カテゴリごとの予算を入力してください。</p></div></div>
           <div className="setup-fields">
-            {categories.filter(category => !(category.isEmergency || category.isFixed || category.name === '緊急支出')).map(category => (
+            {categories.filter(isBudgetCategory).map(category => (
               <label key={category.id} className="setup-field">
-                <span><i style={{ backgroundColor: category.color || '#94a3b8' }} />{category.name}</span>
+                <span><i style={{ backgroundColor: category.color || '#94a3b8' }} />{category.name}{category.isCarryover && <small className="text-secondary">積立型・使用可能 {formatCurrency(availableBudgetByCategory[category.id] || 0)}</small>}</span>
                 <div><span>¥</span><input type="number" inputMode="numeric" min="0" value={budgetInputs[category.id] || ''} onChange={event => handleBudgetChange(category.id, event.target.value)} placeholder="0" /></div>
               </label>
             ))}
           </div>
-          {categories.filter(category => !(category.isEmergency || category.isFixed || category.name === '緊急支出')).length === 0 && <p className="empty-state">先にカテゴリ管理から支出カテゴリを追加してください。</p>}
+          <div className="setup-summary-total"><span>予算全体</span><strong>{formatCurrency(normalBudgetTotal)}</strong><small>入力したカテゴリ予算の合計（緊急支出枠を除く）</small></div>
+          {categories.filter(isBudgetCategory).length === 0 && <p className="empty-state">先にカテゴリ管理から支出カテゴリを追加してください。</p>}
           <button className="btn btn-primary" onClick={() => setStep(2)}>次へ：貯金積立額 <ChevronRight size={18} /></button>
         </section>
       )}

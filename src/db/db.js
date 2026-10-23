@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { isEmergencyCategory } from '../utils/categoryUtils';
 
 export const db = new Dexie('kakeiboDB');
 
@@ -74,7 +75,7 @@ export const initDB = async () => {
   // 緊急支出カテゴリの存在保証（既存DBへのマイグレーション）
   try {
     const allCategories = await db.categories.toArray();
-    const emergencyCat = allCategories.find(c => c.id === EMERGENCY_CATEGORY_ID || c.isEmergency || c.name === '緊急支出');
+    const emergencyCat = allCategories.find(isEmergencyCategory);
     if (!emergencyCat) {
       await db.categories.add(EMERGENCY_CATEGORY);
     } else {

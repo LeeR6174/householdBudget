@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import { db } from '../db/db';
+import { isEmergencyCategory } from '../utils/categoryUtils';
 import { getCurrentBudgetMonth } from '../utils/dateUtils';
 import { ensurePastBudgets } from '../utils/budgetUtils';
 
@@ -96,7 +97,7 @@ export default function CategoriesPage() {
 
   const handleDelete = async (id) => {
     const cat = categories.find(c => c.id === id);
-    if (cat?.isEmergency || cat?.isFixed || cat?.name === '緊急支出') {
+    if (isEmergencyCategory(cat)) {
       alert('「緊急支出」は固定枠のため削除できません。');
       return;
     }
@@ -137,7 +138,7 @@ export default function CategoriesPage() {
     if (!name.trim()) return alert('カテゴリ名を入力してください');
 
     const oldCat = editId ? categories.find(c => c.id === editId) : null;
-    const isEmergency = oldCat?.isEmergency || oldCat?.isFixed || oldCat?.name === '緊急支出';
+    const isEmergency = isEmergencyCategory(oldCat);
 
     if (name.trim() === '緊急支出' && !isEmergency) {
       return alert('「緊急支出」は既に固定枠として登録されています');
@@ -205,7 +206,7 @@ export default function CategoriesPage() {
     <div className="mb-lg">
       <h3 className="font-bold mb-sm text-secondary">{title}</h3>
       {cats.map((cat, index) => {
-        const isEmergency = cat.isEmergency || cat.isFixed || cat.name === '緊急支出';
+        const isEmergency = isEmergencyCategory(cat);
         return (
           <div 
             key={cat.id} 
@@ -379,7 +380,7 @@ export default function CategoriesPage() {
             <form onSubmit={handleSave}>
               {(() => {
                 const editingCat = categories.find(c => c.id === editId);
-                const isEditingEmergency = editingCat?.isEmergency || editingCat?.isFixed || editingCat?.name === '緊急支出';
+                const isEditingEmergency = isEmergencyCategory(editingCat);
 
                 return (
                   <>

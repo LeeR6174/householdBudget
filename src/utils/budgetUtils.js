@@ -1,5 +1,7 @@
 import { db } from '../db/db';
 import { getPrevMonth, getBudgetMonth } from './dateUtils';
+import { isCountedExpense } from './transactionUtils';
+export { calculateCarryoverOpeningBalance, calculateCarryoverAvailable } from './budgetCalculationUtils';
 
 /**
  * Calculates the cumulative balance for a carryover category.
@@ -12,13 +14,15 @@ import { getPrevMonth, getBudgetMonth } from './dateUtils';
 export const calculateCarryoverBalance = (category, currentMonth, categoryTransactions, categoryBudgets) => {
   if (!category.isCarryover) return 0;
 
-  if (categoryTransactions.length === 0 && categoryBudgets.length === 0) {
+  const countedTransactions = categoryTransactions.filter(isCountedExpense);
+
+  if (countedTransactions.length === 0 && categoryBudgets.length === 0) {
     return categoryBudgets.find(b => b.month === currentMonth)?.budget ?? (category.monthlyLimit || 0);
   }
 
   // Find start month
   let months = [];
-  categoryTransactions.forEach(t => months.push(getBudgetMonth(t.date)));
+  countedTransactions.forEach(t => months.push(getBudgetMonth(t.date)));
   categoryBudgets.forEach(b => months.push(b.month));
   months.sort();
   
@@ -46,7 +50,7 @@ export const calculateCarryoverBalance = (category, currentMonth, categoryTransa
   }
 
   // 3. Subtract all expenses for this category up to the END of currentMonth
-  const totalSpent = categoryTransactions
+  const totalSpent = countedTransactions
     .filter(t => getBudgetMonth(t.date) <= currentMonth)
     .reduce((sum, t) => sum + t.amount, 0);
 

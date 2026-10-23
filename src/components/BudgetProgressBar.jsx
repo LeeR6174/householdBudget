@@ -1,8 +1,10 @@
 import React from 'react';
 import { formatCurrency } from '../utils/format';
 
+import { isEmergencyCategory } from '../utils/categoryUtils';
+
 export default function BudgetProgressBar({ category, spent, limit: propLimit, isCarryover, isEmergency: propIsEmergency, onClick }) {
-  const isEmergency = propIsEmergency || category.isEmergency || category.isFixed || category.name === '緊急支出';
+  const isEmergency = propIsEmergency || isEmergencyCategory(category);
   const limit = propLimit !== undefined ? propLimit : (category.monthlyLimit || 0);
   const isUnbudgeted = limit === 0;
 
