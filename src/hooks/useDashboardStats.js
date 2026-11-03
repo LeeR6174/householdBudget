@@ -39,8 +39,16 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
       if (t.date && t.date <= todayStr) {
         if (t.type === 'income') {
           if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] += t.amount;
-        } else if (t.type === 'expense' && !isSettledReimbursement(t)) {
-          if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
+        } else if (t.type === 'expense') {
+          if (t.isReimbursement === true && t.reimbursementStatus === 'settled') {
+            if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
+            const refundAsset = assets.find(a => a.type === t.reimbursementMethod);
+            if (refundAsset && assetBalances[refundAsset.id] !== undefined) {
+              assetBalances[refundAsset.id] += t.amount;
+            }
+          } else if (!isSettledReimbursement(t)) {
+            if (assetBalances[t.assetId] !== undefined) assetBalances[t.assetId] -= t.amount;
+          }
         } else if (t.type === 'transfer') {
           if (assetBalances[t.fromAssetId] !== undefined) assetBalances[t.fromAssetId] -= t.amount;
           if (assetBalances[t.toAssetId] !== undefined) assetBalances[t.toAssetId] += t.amount;
@@ -202,12 +210,9 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     const remainingBudget = totalBudget - normalExpense;
     const effectiveRemainingBudget = Math.max(0, remainingBudget);
 
-    // 3. 今月末での予測金
-    // A. 緊急支出差引後の予測金（実質残高 - 残り通常予算）
-    const projectedMonthEndBalanceWithEmergency = realNetBalance - effectiveRemainingBudget;
-
-    // B. 通常予算ベースの予測金（緊急支出がなかった場合の着地予測）
-    const projectedMonthEndBalance = projectedMonthEndBalanceWithEmergency + emergencyExpense;
+    // 3. 今月末での予測金（緊急支出は実質残高に反映済み）
+    const projectedMonthEndBalance = realNetBalance - effectiveRemainingBudget;
+    const projectedMonthEndBalanceWithEmergency = projectedMonthEndBalance;
 
     // 後方互換性のための netWorth
     const netWorth = realNetBalance;

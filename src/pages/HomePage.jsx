@@ -67,9 +67,6 @@ export default function HomePage() {
 
   const currentRealNet = realNetBalance !== undefined ? realNetBalance : netWorth;
   const currentProjected = projectedMonthEndBalance !== undefined ? projectedMonthEndBalance : (currentRealNet - Math.max(0, remainingBudget || 0));
-  const currentProjectedWithEmergency = stats.projectedMonthEndBalanceWithEmergency !== undefined 
-    ? stats.projectedMonthEndBalanceWithEmergency 
-    : (currentProjected - (emergencyExpense || 0));
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
@@ -246,7 +243,7 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
-                {emergencyExpense > 0 ? '突発的な特別出費（総予算には含みません）' : '今月の緊急支出なし'}
+                {emergencyExpense > 0 ? '突発的な特別出費（総予算外・実質残高に反映済み）' : '今月の緊急支出なし'}
               </div>
             </div>
             <div className="text-base font-black" style={{ color: emergencyExpense > 0 ? '#f87171' : 'rgba(255,255,255,0.75)' }}>
@@ -259,25 +256,20 @@ export default function HomePage() {
           {/* 3. 今月末での予測金 */}
           <div className="flex-between items-center" style={{
             padding: '10px 12px',
-            backgroundColor: emergencyExpense > 0 ? 'rgba(239, 68, 68, 0.16)' : 'rgba(255,255,255,0.04)',
+            backgroundColor: 'rgba(255,255,255,0.04)',
             borderRadius: '12px',
-            border: emergencyExpense > 0 ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(255,255,255,0.08)'
+            border: '1px solid rgba(255,255,255,0.08)'
           }}>
             <div>
-              <div className="text-xs font-bold flex items-center gap-xs" style={{ color: emergencyExpense > 0 ? '#fca5a5' : '#c084fc' }}>
+              <div className="text-xs font-bold flex items-center gap-xs" style={{ color: '#c084fc' }}>
                 <span>🔮 今月末での予測金</span>
-                {emergencyExpense > 0 && (
-                  <span style={{ fontSize: '9px', backgroundColor: 'rgba(239, 68, 68, 0.25)', padding: '1px 5px', borderRadius: '4px', color: '#fecaca' }}>
-                    緊急支出差引後
-                  </span>
-                )}
               </div>
               <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-                実質残高 − 残り通常予算{emergencyExpense > 0 ? ` (通常予測 ${formatCurrency(currentProjected)} − 緊急 ${formatCurrency(emergencyExpense)})` : ' (予算消化後の着地)'}
+                実質残高 − 残り通常予算
               </div>
             </div>
-            <div className="text-xl font-black" style={{ color: currentProjectedWithEmergency < 0 ? '#fca5a5' : '#e9d5ff', letterSpacing: '-0.02em' }}>
-              {formatCurrency(currentProjectedWithEmergency)}
+            <div className="text-xl font-black" style={{ color: currentProjected < 0 ? '#fca5a5' : '#e9d5ff', letterSpacing: '-0.02em' }}>
+              {formatCurrency(currentProjected)}
             </div>
           </div>
         </div>

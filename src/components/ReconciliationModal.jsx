@@ -28,8 +28,16 @@ export default function ReconciliationModal({ isOpen, onClose, onComplete }) {
       if (t.date && t.date <= todayStr) {
         if (t.type === 'income') {
           if (balances[t.assetId] !== undefined) balances[t.assetId] += t.amount;
-        } else if (t.type === 'expense' && !isSettledReimbursement(t)) {
-          if (balances[t.assetId] !== undefined) balances[t.assetId] -= t.amount;
+        } else if (t.type === 'expense') {
+          if (t.isReimbursement === true && t.reimbursementStatus === 'settled') {
+            if (balances[t.assetId] !== undefined) balances[t.assetId] -= t.amount;
+            const refundAsset = nonCreditAssets.find(a => a.type === t.reimbursementMethod);
+            if (refundAsset && balances[refundAsset.id] !== undefined) {
+              balances[refundAsset.id] += t.amount;
+            }
+          } else if (!isSettledReimbursement(t)) {
+            if (balances[t.assetId] !== undefined) balances[t.assetId] -= t.amount;
+          }
         } else if (t.type === 'transfer') {
           if (balances[t.fromAssetId] !== undefined) balances[t.fromAssetId] -= t.amount;
           if (balances[t.toAssetId] !== undefined) balances[t.toAssetId] += t.amount;
