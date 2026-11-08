@@ -11,7 +11,7 @@ export default function SubscriptionsPage() {
     db.categories
       .where('type').equals('expense')
       .toArray()
-      .then(cats => cats.filter(c => !c.isEmergency && !c.isFixed && c.name !== '緊急支出').sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))
+      .then(cats => cats.filter(c => !c.isHidden && !c.isEmergency && !c.isFixed && c.name !== '緊急支出').sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))
   ) || [];
   const assets = useLiveQuery(() => db.assets.where('type').equals('credit').toArray()) || []; // クレジットカード限定
   

@@ -18,6 +18,15 @@ export default function HomePage() {
   const { startDate, endDate } = getMonthRange(currentMonth);
 
   const stats = useDashboardStats(currentMonth, startDate, endDate);
+  const transactionCount = useLiveQuery(() => db.transactions.count()) ?? 0;
+  const hasConfiguredBalance = stats?.assets
+    ?.filter(asset => asset.type !== 'credit')
+    .some(asset => (asset.initialBalance || 0) !== 0);
+  const shouldShowInitialSetup = Boolean(
+    stats &&
+    transactionCount === 0 &&
+    !hasConfiguredBalance
+  );
   
   // 照合モーダルの状態管理
   const [showReconcileModal, setShowReconcileModal] = useState(false);
@@ -28,11 +37,18 @@ export default function HomePage() {
   };
 
   const handleSettlementMethodSelect = async (method) => {
-    await db.transactions.update(settlementTransaction.id, {
-      reimbursementStatus: 'settled',
-      reimbursementMethod: method
-    });
-    setSettlementTransaction(null);
+    if (!settlementTransaction) return;
+
+    try {
+      await db.transactions.update(settlementTransaction.id, {
+        reimbursementStatus: 'settled',
+        reimbursementMethod: method
+      });
+      setSettlementTransaction(null);
+    } catch (error) {
+      console.error('Failed to settle reimbursement:', error);
+      alert('立替精算の保存に失敗しました。もう一度お試しください。');
+    }
   };
   
   if (!stats) {
@@ -79,7 +95,7 @@ export default function HomePage() {
       </div>
 
       {/* 初期設定案内バナー */}
-      {assets.length === 0 && (
+      {shouldShowInitialSetup && (
         <div className="card mb-lg" style={{ border: '2px dashed var(--primary-color)', backgroundColor: 'rgba(79, 70, 229, 0.05)', textAlign: 'center' }}>
           <div className="text-2xl mb-sm">👋 はじめまして！</div>
           <p className="text-sm text-secondary mb-md">
@@ -129,9 +145,6 @@ export default function HomePage() {
               <span style={{ color: 'rgba(255,255,255,0.6)' }}>現金: </span>
               <span className="font-bold" style={{ color: '#fff' }}>{formatCurrency(cashBalance)}</span>
             </div>
-          </div>
-          <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            手元資金 = 銀行 {formatCurrency(bankBalance)} + 現金 {formatCurrency(cashBalance)} = {formatCurrency(realBalance)}
           </div>
         </div>
 
@@ -187,9 +200,6 @@ export default function HomePage() {
           <div className="flex-between items-center flex-wrap gap-xs">
             <div>
               <div className="text-sm font-bold" style={{ color: '#38bdf8' }}>💎 実質残高 (現在のフリー資金)</div>
-              <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-                {formatCurrency(realBalance)} − {formatCurrency(unpaidTotal)} − {formatCurrency(totalSavings)} = {formatCurrency(currentRealNet)}
-              </div>
             </div>
             <div className="text-right">
               <div className="text-3xl font-black" style={{ color: currentRealNet < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)', lineHeight: '1.1' }}>
@@ -225,7 +235,7 @@ export default function HomePage() {
             </span>
           </div>
           <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            残り通常予算 = 総予算 {formatCurrency(totalBudget)} − 通常支出 {formatCurrency(normalExpense !== undefined ? normalExpense : expense)} = {formatCurrency(remainingBudget || 0)}
+            {formatCurrency(totalBudget)} − {formatCurrency(normalExpense !== undefined ? normalExpense : expense)} = {formatCurrency(remainingBudget || 0)}
           </div>
 
           <div style={{ borderTop: '1px dashed rgba(255,255,255,0.15)', margin: '10px 0 10px 0' }}></div>
@@ -251,10 +261,7 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
-                {emergencyExpense > 0 ? '突発的な特別出費（総予算外・実質残高に反映済み）' : '今月の緊急支出なし'}
-              </div>
-              <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                今月の緊急支出 = {formatCurrency(emergencyExpense)}（総予算には加算しません）
+                {emergencyExpense > 0 ? '総予算外・実質残高に反映済み' : '今月の緊急支出なし'}
               </div>
             </div>
             <div className="text-base font-black" style={{ color: emergencyExpense > 0 ? '#f87171' : 'rgba(255,255,255,0.75)' }}>

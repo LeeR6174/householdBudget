@@ -25,7 +25,7 @@ export default function BudgetPage() {
   const [hasChanges, setHasChanges] = useState(false);
 
   const categories = useLiveQuery(() => 
-    db.categories.where('type').equals('expense').toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))
+    db.categories.where('type').equals('expense').toArray().then(cats => cats.filter(cat => !cat.isHidden).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)))
   ) || [];
 
   const currentMonthBudgets = useLiveQuery(() => 

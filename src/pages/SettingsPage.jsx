@@ -2,14 +2,12 @@ import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Scale } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { db, resetDB } from '../db/db';
 import { getLocalDateString, getLocalISOString } from '../utils/dateUtils';
 import ReconciliationModal from '../components/ReconciliationModal';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
   const backupInputRef = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReconcileModal, setShowReconcileModal] = useState(false);
@@ -58,125 +56,17 @@ export default function SettingsPage() {
     }
   };
 
-  const parseExcelValue = (val) => val === undefined || val === null ? '' : String(val).trim();
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!window.confirm('Excelデータを取り込みますか？')) {
-      fileInputRef.current.value = null;
-      return;
-    }
-
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
-
-      const existingCats = await db.categories.toArray();
-      const existingAssets = await db.assets.toArray();
-      
-      const newTransactions = [];
-      const catMap = new Map(existingCats.map(c => [c.name, c.id]));
-      const assetMap = new Map(existingAssets.map(a => [a.name, a.id]));
-
-      const getOrCreateAsset = (nameStr) => {
-        if (!nameStr) return null;
-        if (assetMap.has(nameStr)) return assetMap.get(nameStr);
-        const newId = `asset_a${Date.now()}_${Math.floor(Math.random()*1000)}`;
-        assetMap.set(nameStr, newId);
-        return newId;
-      };
-
-      const getOrCreateCategory = (nameStr) => {
-        if (!nameStr) return null;
-        if (catMap.has(nameStr)) return catMap.get(nameStr);
-        const newId = `cat_a${Date.now()}_${Math.floor(Math.random()*1000)}`;
-        catMap.set(nameStr, newId);
-        return newId;
-      };
-
-      for (let row of json) {
-        const dateRaw = parseExcelValue(row['期間']);
-        const assetNameRaw = parseExcelValue(row['資産'] || row['資産 '] || ''); 
-        const categoryRaw = parseExcelValue(row['分類']);
-        const contentRaw = parseExcelValue(row['内容']);
-        const inOutRaw = parseExcelValue(row['収入/支出']);
-        const memoRaw = parseExcelValue(row['メモ']);
-        const amountRaw = parseExcelValue(row['JPY'] || row['金額']);
-        
-        const amount = Number(String(amountRaw).replace(/[^0-9.-]+/g, ''));
-        if (isNaN(amount) || amount === 0 || !dateRaw) continue;
-        
-        const dateMatch = dateRaw.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
-        let formattedDate = dateRaw;
-        if (dateMatch) {
-          formattedDate = `${dateMatch[1]}-${String(dateMatch[2]).padStart(2, '0')}-${String(dateMatch[3]).padStart(2, '0')}`;
-        }
-
-        const assetId = getOrCreateAsset(assetNameRaw);
-        let txType = 'expense';
-        let categoryId = null;
-
-        if (inOutRaw === '支出') txType = 'expense';
-        else if (inOutRaw === '収入') txType = 'income';
-        else txType = amount < 0 ? 'expense' : 'income';
-
-        categoryId = getOrCreateCategory(categoryRaw, txType);
-
-        newTransactions.push({
-          id: crypto.randomUUID(),
-          type: txType,
-          amount: Math.abs(amount),
-          categoryId,
-          assetId,
-          fromAssetId: null,
-          toAssetId: null,
-          content: contentRaw,
-          memo: memoRaw,
-          date: formattedDate,
-          createdAt: getLocalISOString(),
-          cardStatus: 'unconfirmed'
-        });
-      }
-
-      const catsToAdd = [];
-      catMap.forEach((id, name) => {
-        if (!existingCats.find(c => c.id === id)) catsToAdd.push({ id, name, type: name.includes('入') ? 'income' : 'expense', color: '#9ca3af' });
-      });
-      if (catsToAdd.length > 0) await db.categories.bulkAdd(catsToAdd);
-
-      const assetsToAdd = [];
-      assetMap.forEach((id, name) => {
-        if (!existingAssets.find(a => a.id === id)) assetsToAdd.push({ id, name, type: 'bank', initialBalance: 0 });
-      });
-      if (assetsToAdd.length > 0) await db.assets.bulkAdd(assetsToAdd);
-
-      if (newTransactions.length > 0) {
-        await db.transactions.bulkAdd(newTransactions);
-        alert(`${newTransactions.length} 件のデータを取り込みました！`);
-        navigate('/');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Excelの読み込みに失敗しました。');
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = null;
-    }
-  };
-
   const handleExportFullBackup = async () => {
     try {
-      const [transactions, categories, assets, settings, monthlySettings, monthlyBudgets, notifications] = await Promise.all([
+      const [transactions, categories, assets, settings, monthlySettings, monthlyBudgets, savingsRecords, subscriptions, notifications] = await Promise.all([
         db.transactions.toArray(),
         db.categories.toArray(),
         db.assets.toArray(),
         db.settings.toArray(),
         db.monthlySettings.toArray(),
         db.monthlyBudgets.toArray(),
+        db.savingsRecords.toArray(),
+        db.subscriptions.toArray(),
         db.notifications.toArray()
       ]);
 
@@ -189,6 +79,8 @@ export default function SettingsPage() {
         settings,
         monthlySettings,
         monthlyBudgets,
+        savingsRecords,
+        subscriptions,
         notifications
       };
 
@@ -220,7 +112,7 @@ export default function SettingsPage() {
         const data = JSON.parse(event.target.result);
         if (!data.transactions || !data.categories || !data.assets) throw new Error('無効な形式');
 
-        await db.transaction('rw', [db.transactions, db.categories, db.assets, db.settings, db.monthlySettings, db.monthlyBudgets, db.notifications], async () => {
+        await db.transaction('rw', [db.transactions, db.categories, db.assets, db.settings, db.monthlySettings, db.monthlyBudgets, db.savingsRecords, db.subscriptions, db.notifications], async () => {
           await Promise.all([
             db.transactions.clear(),
             db.categories.clear(),
@@ -228,6 +120,8 @@ export default function SettingsPage() {
             db.settings.clear(),
             db.monthlySettings.clear(),
             db.monthlyBudgets.clear(),
+            db.savingsRecords.clear(),
+            db.subscriptions.clear(),
             db.notifications.clear()
           ]);
 
@@ -235,9 +129,11 @@ export default function SettingsPage() {
             db.transactions.bulkAdd(data.transactions),
             db.categories.bulkAdd(data.categories),
             db.assets.bulkAdd(data.assets),
-            db.settings.bulkAdd(data.settings),
-            db.monthlySettings.bulkAdd(data.monthlySettings),
-            db.monthlyBudgets.bulkAdd(data.monthlyBudgets),
+            db.settings.bulkAdd(data.settings || []),
+            db.monthlySettings.bulkAdd(data.monthlySettings || []),
+            db.monthlyBudgets.bulkAdd(data.monthlyBudgets || []),
+            db.savingsRecords.bulkAdd(data.savingsRecords || []),
+            db.subscriptions.bulkAdd(data.subscriptions || []),
             db.notifications.bulkAdd(data.notifications || [])
           ]);
         });
@@ -311,10 +207,8 @@ export default function SettingsPage() {
           </div>
 
           <div className="card">
-            <h3 className="font-bold mb-md">インポート / エクスポート</h3>
+            <h3 className="font-bold mb-md">バックアップ / 復元</h3>
             <button className="btn btn-primary w-full mb-lg" onClick={() => navigate('/settings/ai-import')} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}>✨ AI明細インポート</button>
-            <button className="btn btn-outline mb-lg w-full" onClick={() => fileInputRef.current?.click()}>Excelを取り込む (.xlsx)</button>
-            <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
             <div className="flex gap-md mb-lg">
               <button className="btn btn-primary w-full" onClick={handleExportFullBackup}>バックアップ</button>

@@ -154,7 +154,7 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     let totalNormalBudget = 0;
     let totalNormalExpense = 0;
 
-    const categoryStats = categories.filter(c => c.type === 'expense').map(cat => {
+    const allCategoryStats = categories.filter(c => c.type === 'expense').map(cat => {
       const isEmergency = emergencyCatIds.has(cat.id) || isEmergencyCategory(cat);
       const spent = expenseByCategory[cat.id] || 0;
       const catTxs = txByCategory[cat.id] || [];
@@ -194,6 +194,8 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     totalNormalExpense += (expenseByCategory['uncategorized'] || 0);
     const recentTransactions = currentMonthTx.slice(0, 5);
     const uncategorizedExpense = expenseByCategory['uncategorized'] || 0;
+
+    const categoryStats = allCategoryStats.filter(category => !category.isHidden);
 
     // 1. 実質残高（現在のフリー資金：手元資金 - カード未払総額 - 貯金総額）
     const realNetBalance = realBalance + creditBalance - totalSavings;

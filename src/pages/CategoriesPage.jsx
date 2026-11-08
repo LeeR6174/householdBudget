@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { ChevronLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, Lock, Eye, EyeOff } from 'lucide-react';
 import { db } from '../db/db';
 import { isEmergencyCategory } from '../utils/categoryUtils';
 import { getCurrentBudgetMonth } from '../utils/dateUtils';
@@ -106,6 +106,11 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleToggleHidden = async (cat) => {
+    if (isEmergencyCategory(cat)) return;
+    await db.categories.update(cat.id, { isHidden: !cat.isHidden });
+  };
+
   const handleMove = async (catsList, currentIndex, direction) => {
     const targetIndex = currentIndex + direction;
     if (targetIndex < 0 || targetIndex >= catsList.length) return;
@@ -202,7 +207,7 @@ export default function CategoriesPage() {
   const expenseCats = categories.filter(c => c.type === 'expense');
   const incomeCats = categories.filter(c => c.type === 'income');
 
-  const CategoryList = ({ cats, title }) => (
+  const CategoryList = ({ cats, title, hidden = false }) => (
     <div className="mb-lg">
       <h3 className="font-bold mb-sm text-secondary">{title}</h3>
       {cats.map((cat, index) => {
@@ -213,7 +218,7 @@ export default function CategoriesPage() {
             className="list-item" 
             style={{ 
               padding: '10px 12px',
-              backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.04)' : 'transparent',
+              backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.04)' : hidden ? 'rgba(100, 116, 139, 0.05)' : 'transparent',
               borderRadius: isEmergency ? '14px' : '0',
               border: isEmergency ? '1px dashed rgba(239, 68, 68, 0.25)' : 'none',
               marginBottom: isEmergency ? '6px' : '0'
@@ -278,6 +283,17 @@ export default function CategoriesPage() {
                 <Edit2 size={18} />
                 <span>編集</span>
               </button>
+              {!isEmergency && (
+                <button
+                  onClick={() => handleToggleHidden(cat)}
+                  className="btn-icon text-secondary"
+                  title={cat.isHidden ? '表示する' : '非表示にする'}
+                  aria-label={cat.isHidden ? 'カテゴリを表示する' : 'カテゴリを非表示にする'}
+                >
+                  {cat.isHidden ? <Eye size={18} /> : <EyeOff size={18} />}
+                  <span>{cat.isHidden ? '表示' : '非表示'}</span>
+                </button>
+              )}
               {isEmergency ? (
                 <div 
                   className="flex-center" 
@@ -524,8 +540,21 @@ export default function CategoriesPage() {
       )}
 
       <div className="card">
-        <CategoryList cats={expenseCats} title="支出カテゴリー" />
-        <CategoryList cats={incomeCats} title="収入カテゴリー" />
+        <CategoryList cats={expenseCats.filter(cat => !cat.isHidden)} title="支出カテゴリー" />
+        <CategoryList cats={incomeCats.filter(cat => !cat.isHidden)} title="収入カテゴリー" />
+        {(expenseCats.some(cat => cat.isHidden) || incomeCats.some(cat => cat.isHidden)) && (
+          <div className="card" style={{ backgroundColor: 'rgba(100, 116, 139, 0.04)', border: '1px dashed var(--border-color)' }}>
+            <div className="flex items-center gap-xs mb-md">
+              <EyeOff size={16} className="text-secondary" />
+              <h3 className="font-bold text-secondary" style={{ margin: 0 }}>非表示中のカテゴリ</h3>
+            </div>
+            <p className="text-xs text-secondary mb-md">
+              非表示カテゴリは新しい入力や予算設定の候補に表示されません。過去の記録は保持されます。
+            </p>
+            <CategoryList cats={expenseCats.filter(cat => cat.isHidden)} title="支出カテゴリ" hidden />
+            <CategoryList cats={incomeCats.filter(cat => cat.isHidden)} title="収入カテゴリ" hidden />
+          </div>
+        )}
       </div>
     </div>
   );
