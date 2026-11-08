@@ -70,23 +70,13 @@ export default function SavingsPage() {
     }
 
     return months.map(m => {
-      const monthlyAdditionsLimit = allMonthlySettings
-        .filter(s => s.month <= m)
-        .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
-
-      const dbExtraAdditions = savingsRecords
-        .filter(r => r.type === 'addition' && r.month <= m)
-        .reduce((sum, r) => sum + (r.amount || 0), 0);
-
-      const dbDepletions = savingsRecords
-        .filter(r => r.type === 'depletion' && r.month <= m)
-        .reduce((sum, r) => sum + (r.amount || 0), 0);
-
-      const txDepletions = transactions
-        .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= m)
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-      const balance = Math.max(0, initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions) + (settings?.savingsAdjustment || 0));
+      const balance = getSavingsBreakdown({
+        settings,
+        monthlySettings: allMonthlySettings,
+        savingsRecords,
+        transactions,
+        currentMonth: m
+      }).totalSavings;
 
       return {
         name: `${parseInt(m.split('-')[1], 10)}月分`,

@@ -7,6 +7,7 @@ import { getCurrentBudgetMonth, getLocalDateString, getLocalISOString } from '..
 import { formatCurrency } from '../utils/format';
 import ReimbursementSettlementModal from '../components/ReimbursementSettlementModal';
 import { isEmergencyCategory } from '../utils/categoryUtils';
+import { getSavingsBreakdown } from '../utils/savingsUtils';
 
 export default function AddTransactionPage() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function AddTransactionPage() {
   };
 
   const categoryType = type === 'reimbursement' ? 'expense' : type;
-  const categories = useLiveQuery(() => db.categories.where('type').equals(categoryType).toArray().then(cats => cats.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))), [categoryType]) || [];
+  const categories = useLiveQuery(() => db.categories.where('type').equals(categoryType).toArray().then(cats => cats.filter(cat => !cat.isHidden || cat.id === categoryId).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))), [categoryType, categoryId]) || [];
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
   const settings = useLiveQuery(() => db.settings.get('master'));
   const allMonthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
@@ -74,17 +75,15 @@ export default function AddTransactionPage() {
 
   const currentSavings = useMemo(() => {
     if (!settings) return 0;
-    const initial = settings.targetSavings || 0;
     const currentBudgetMonth = getCurrentBudgetMonth();
-    const monthly = allMonthlySettings
-      .filter(s => s.month <= currentBudgetMonth)
-      .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
-    const extra = savingsRecords.filter(r => r.type === 'addition').reduce((sum, r) => sum + (r.amount || 0), 0);
-    const dbDep = savingsRecords.filter(r => r.type === 'depletion').reduce((sum, r) => sum + (r.amount || 0), 0);
-    const txDep = allTransactions
-      .filter(t => t.type === 'expense' && t.isSavingsDepletion && (!id || t.id !== id))
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-    return Math.max(0, initial + monthly + extra - (dbDep + txDep));
+    const transactions = allTransactions.filter(transaction => !id || transaction.id !== id);
+    return getSavingsBreakdown({
+      settings,
+      monthlySettings: allMonthlySettings,
+      savingsRecords,
+      transactions,
+      currentMonth: currentBudgetMonth
+    }).totalSavings;
   }, [settings, allMonthlySettings, savingsRecords, allTransactions, id]);
 
   // Fetch existing transaction if editing

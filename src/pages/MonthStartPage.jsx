@@ -19,7 +19,7 @@ export default function MonthStartPage() {
   const { startDate, endDate } = getMonthRange(selectedMonth);
 
   const categories = useLiveQuery(() => db.categories.where('type').equals('expense').toArray().then(items => (
-    items.sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
+    items.filter(item => !item.isHidden).sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
   ))) || [];
   const monthlyBudgets = useLiveQuery(() => db.monthlyBudgets.where('month').equals(selectedMonth).toArray()) || [];
   const allMonthlyBudgets = useLiveQuery(() => db.monthlyBudgets.toArray()) || [];

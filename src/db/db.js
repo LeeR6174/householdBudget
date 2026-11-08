@@ -108,7 +108,9 @@ export const resetDB = async () => {
   await db.assets.clear();
   await db.settings.clear();
   await db.subscriptions.clear();
+  await db.savingsRecords.clear();
   await db.monthlyBudgets.clear();
   await db.monthlySettings.clear();
+  await db.notifications.clear();
   await initDB();
 };
