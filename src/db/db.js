@@ -63,6 +63,7 @@ const DEFAULT_SETTINGS = {
   id: 'master',
   currency: 'JPY',
   targetSavings: 0,
+  savingsAdjustment: 0,
   lastReconciliationDate: ''
 };
 

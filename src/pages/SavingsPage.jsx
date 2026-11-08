@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, Plus, History, AlertCircle, Save, Sparkles, Check } from 'lucide-react';
+import { ChevronLeft, Plus, History, AlertCircle, Save, Sparkles, Check, Settings2 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip 
 } from 'recharts';
 import { db } from '../db/db';
 import { formatCurrency } from '../utils/format';
 import { getCurrentBudgetMonth, getLocalDateString, getBudgetMonth, getPrevMonth, getNextMonth } from '../utils/dateUtils';
+import { getSavingsBreakdown } from '../utils/savingsUtils';
 
 export default function SavingsPage() {
   const navigate = useNavigate();
@@ -37,26 +38,16 @@ export default function SavingsPage() {
   }, [currentMonthlySetting]);
 
   // 1. 今月の貯金総額等の集計
-  const initialSavings = settings?.targetSavings || 0;
-  const monthlyAdditions = allMonthlySettings
-    .filter(s => s.month <= currentMonthStr)
-    .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
-  
-  const totalDepletions = useMemo(() => {
-    const dbDepletions = savingsRecords
-      .filter(r => r.type === 'depletion' && r.month <= currentMonthStr)
-      .reduce((sum, r) => sum + (r.amount || 0), 0);
-    const txDepletions = transactions
-      .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= currentMonthStr)
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-    return dbDepletions + txDepletions;
-  }, [savingsRecords, transactions, currentMonthStr]);
+  const savings = getSavingsBreakdown({
+    settings,
+    monthlySettings: allMonthlySettings,
+    savingsRecords,
+    transactions,
+    currentMonth: currentMonthStr
+  });
+  const { initialSavings, monthlyAdditions, extraAdditions, totalDepletions } = savings;
 
-  const extraAdditions = savingsRecords
-    .filter(r => r.type === 'addition' && r.month <= currentMonthStr)
-    .reduce((sum, r) => sum + (r.amount || 0), 0);
-
-  const currentTotalSavings = Math.max(0, initialSavings + monthlyAdditions + extraAdditions - totalDepletions);
+  const currentTotalSavings = savings.totalSavings;
 
   const previousTargetMonth = getPrevMonth(targetMonth);
   const previousMonthlySetting = allMonthlySettings.find(s => s.month === previousTargetMonth);
@@ -95,7 +86,7 @@ export default function SavingsPage() {
         .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= m)
         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
-      const balance = Math.max(0, initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions));
+      const balance = Math.max(0, initialSavings + monthlyAdditionsLimit + dbExtraAdditions - (dbDepletions + txDepletions) + (settings?.savingsAdjustment || 0));
 
       return {
         name: `${parseInt(m.split('-')[1], 10)}月分`,
@@ -221,12 +212,21 @@ export default function SavingsPage() {
 
   return (
     <div className="page-container" style={{ paddingBottom: '100px' }}>
-      <div className="flex gap-sm items-center mb-lg">
+      <div className="flex-between items-center mb-lg">
         <button className="btn-back" onClick={() => navigate(-1)}>
           <ChevronLeft size={24} />
           <span>戻る</span>
         </button>
         <div className="page-title" style={{ marginBottom: 0 }}>貯金ダッシュボード</div>
+        <button
+          className="header-action-button"
+          type="button"
+          onClick={() => navigate('/settings/initial-balance')}
+          title="現在の貯金額を修正"
+        >
+          <Settings2 size={18} />
+          <span>残高を修正</span>
+        </button>
       </div>
 
       {/* 👑 貯金総額 & グラフィカルな内訳グリッド */}
@@ -241,6 +241,11 @@ export default function SavingsPage() {
         <div className="text-4xl font-black mb-lg" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
           {formatCurrency(currentTotalSavings)}
         </div>
+        {savings.adjustment !== 0 && (
+          <div className="text-xs mb-md" style={{ color: '#c7d2fe' }}>
+            初期設定からの残高補正: {savings.adjustment > 0 ? '+' : ''}{formatCurrency(savings.adjustment)}
+          </div>
+        )}
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '16px' }}>
           <div style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '10px 12px', borderRadius: '12px' }}>

@@ -130,6 +130,9 @@ export default function HomePage() {
               <span className="font-bold" style={{ color: '#fff' }}>{formatCurrency(cashBalance)}</span>
             </div>
           </div>
+          <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            手元資金 = 銀行 {formatCurrency(bankBalance)} + 現金 {formatCurrency(cashBalance)} = {formatCurrency(realBalance)}
+          </div>
         </div>
 
         {/* 差し引き記号とボーダー */}
@@ -184,7 +187,9 @@ export default function HomePage() {
           <div className="flex-between items-center flex-wrap gap-xs">
             <div>
               <div className="text-sm font-bold" style={{ color: '#38bdf8' }}>💎 実質残高 (現在のフリー資金)</div>
-              <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>手元資金 − カード未払額 − 貯金総額</div>
+              <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                {formatCurrency(realBalance)} − {formatCurrency(unpaidTotal)} − {formatCurrency(totalSavings)} = {formatCurrency(currentRealNet)}
+              </div>
             </div>
             <div className="text-right">
               <div className="text-3xl font-black" style={{ color: currentRealNet < 0 ? '#fca5a5' : '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.3)', lineHeight: '1.1' }}>
@@ -219,6 +224,9 @@ export default function HomePage() {
               {(remainingBudget ?? 0) < 0 ? `超過 -${formatCurrency(Math.abs(remainingBudget))}` : formatCurrency(remainingBudget || 0)}
             </span>
           </div>
+          <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            残り通常予算 = 総予算 {formatCurrency(totalBudget)} − 通常支出 {formatCurrency(normalExpense !== undefined ? normalExpense : expense)} = {formatCurrency(remainingBudget || 0)}
+          </div>
 
           <div style={{ borderTop: '1px dashed rgba(255,255,255,0.15)', margin: '10px 0 10px 0' }}></div>
 
@@ -245,6 +253,9 @@ export default function HomePage() {
               <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
                 {emergencyExpense > 0 ? '突発的な特別出費（総予算外・実質残高に反映済み）' : '今月の緊急支出なし'}
               </div>
+              <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                今月の緊急支出 = {formatCurrency(emergencyExpense)}（総予算には加算しません）
+              </div>
             </div>
             <div className="text-base font-black" style={{ color: emergencyExpense > 0 ? '#f87171' : 'rgba(255,255,255,0.75)' }}>
               {emergencyExpense > 0 ? `− ${formatCurrency(emergencyExpense)}` : formatCurrency(0)}
@@ -266,6 +277,10 @@ export default function HomePage() {
               </div>
               <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
                 実質残高 − 残り通常予算
+              </div>
+              <div className="text-[10px] mt-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                {formatCurrency(currentRealNet)} − {formatCurrency(Math.max(0, remainingBudget || 0))} = {formatCurrency(currentProjected)}
+                {(remainingBudget ?? 0) < 0 && '（予算超過のため控除額は0円）'}
               </div>
             </div>
             <div className="text-xl font-black" style={{ color: currentProjected < 0 ? '#fca5a5' : '#e9d5ff', letterSpacing: '-0.02em' }}>

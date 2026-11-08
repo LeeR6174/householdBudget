@@ -3,11 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft } from 'lucide-react';
 import { db } from '../db/db';
+import { getCurrentBudgetMonth } from '../utils/dateUtils';
+import { getSavingsBreakdown } from '../utils/savingsUtils';
 
 export default function InitialBalancePage() {
   const navigate = useNavigate();
   const settings = useLiveQuery(() => db.settings.get('master'));
   const assets = useLiveQuery(() => db.assets.toArray()) || [];
+  const monthlySettings = useLiveQuery(() => db.monthlySettings.toArray()) || [];
+  const savingsRecords = useLiveQuery(() => db.savingsRecords.toArray()) || [];
+  const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
+  const savings = getSavingsBreakdown({
+    settings,
+    monthlySettings,
+    savingsRecords,
+    transactions,
+    currentMonth: getCurrentBudgetMonth()
+  });
 
   const handleUpdateAsset = async (id, value, type) => {
     let num = Number(value) || 0;
@@ -21,6 +33,13 @@ export default function InitialBalancePage() {
     if (settings) {
       await db.settings.update('master', { targetSavings: Number(value) || 0 });
     }
+  };
+
+  const handleUpdateCurrentSavings = async (value) => {
+    const target = Math.max(0, Number(value) || 0);
+    await db.settings.update('master', {
+      savingsAdjustment: target - savings.rawBeforeAdjustment
+    });
   };
 
   return (
@@ -48,6 +67,25 @@ export default function InitialBalancePage() {
               className="form-control" 
               value={settings?.targetSavings || ''} 
               onChange={(e) => handleUpdateTargetSavings(e.target.value)} 
+              placeholder="0"
+              style={{ fontWeight: 'bold' }}
+            />
+            <span className="ml-sm font-bold">円</span>
+          </div>
+        </div>
+
+        <div className="form-group mb-xl">
+          <label className="form-label text-sm text-secondary font-bold">🐷 現在の貯金額</label>
+          <p className="text-xs text-secondary mb-sm">
+            引継ぎ後など、実際の貯金残高に合わせて修正できます。履歴や毎月の積立設定は変更されません。
+          </p>
+          <div className="flex-center">
+            <input
+              type="number"
+              inputMode="numeric"
+              className="form-control"
+              value={settings ? savings.totalSavings : ''}
+              onChange={(e) => handleUpdateCurrentSavings(e.target.value)}
               placeholder="0"
               style={{ fontWeight: 'bold' }}
             />
