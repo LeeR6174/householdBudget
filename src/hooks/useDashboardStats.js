@@ -4,6 +4,7 @@ import { calculateCarryoverBalance } from '../utils/budgetUtils';
 import { getLocalDateString, getBudgetMonth } from '../utils/dateUtils';
 import { isCountedExpense, isSettledReimbursement } from '../utils/transactionUtils';
 import { isEmergencyCategory } from '../utils/categoryUtils';
+import { getSavingsBreakdown } from '../utils/savingsUtils';
 
 export function useDashboardStats(currentMonth, startDate, endDate) {
   return useLiveQuery(async () => {
@@ -63,27 +64,18 @@ export function useDashboardStats(currentMonth, startDate, endDate) {
     const unpaidTotal = creditBalance < 0 ? Math.abs(creditBalance) : 0;
 
     // 3. 貯金計算
-    const initialSavings = settings?.targetSavings || 0;
-    const monthlyAdditions = allMonthlySettings
-      .filter(s => s.month <= currentMonth)
-      .reduce((sum, s) => sum + (s.targetSavings || 0), 0);
-    
-    const dbDepletions = savingsRecords
-      .filter(r => r.type === 'depletion' && r.month <= currentMonth)
-      .reduce((sum, r) => sum + (r.amount || 0), 0);
-    const txDepletions = allTx
-      .filter(t => t.type === 'expense' && t.isSavingsDepletion && getBudgetMonth(t.date) <= currentMonth)
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-    const totalDepletions = dbDepletions + txDepletions;
-    
-    const extraAdditions = savingsRecords
-      .filter(r => r.type === 'addition' && r.month <= currentMonth)
-      .reduce((sum, r) => sum + (r.amount || 0), 0);
+    const savings = getSavingsBreakdown({
+      settings,
+      monthlySettings: allMonthlySettings,
+      savingsRecords,
+      transactions: allTx,
+      currentMonth
+    });
+    const { initialSavings, monthlyAdditions, extraAdditions, totalDepletions } = savings;
 
     // 貯金原資の総額（切り崩し前）
-    const totalSavingsBeforeDepletions = initialSavings + monthlyAdditions + extraAdditions;
-    const rawTotalSavings = totalSavingsBeforeDepletions - totalDepletions;
-    const totalSavings = Math.max(0, rawTotalSavings);
+    const rawTotalSavings = savings.rawBeforeAdjustment + savings.adjustment;
+    const totalSavings = savings.totalSavings;
     
     // 貯金残高を超過して支払われた金額（貯金で賄えなかった不足分）
     const savingsOverflow = rawTotalSavings < 0 ? Math.abs(rawTotalSavings) : 0;

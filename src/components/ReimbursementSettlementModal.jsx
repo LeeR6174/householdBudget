@@ -36,7 +36,9 @@ export default function ReimbursementSettlementModal({ isOpen, onClose, onSelect
             <X size={20} />
           </button>
         </div>
-        <p className="text-sm text-secondary mb-lg">立替分はどの方法で返金されましたか？</p>
+        <p className="text-sm text-secondary mb-lg">
+          精算すると、返金先の資産に立替額を加算し、元の支出を集計から除外します。
+        </p>
         <div className="flex gap-sm">
           <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => onSelect('bank')}>
             銀行
